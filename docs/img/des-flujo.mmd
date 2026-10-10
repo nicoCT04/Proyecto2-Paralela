@@ -1,0 +1,28 @@
+%% Diagrama de flujo de DES (cifrado de un bloque de 64 bits).
+%% Generar el PNG:  npx -y @mermaid-js/mermaid-cli -i docs/img/des-flujo.mmd -o docs/img/des-flujo.png -s 2 -b white
+flowchart LR
+    subgraph CIF["Cifrado de un bloque"]
+        direction TB
+        IN["Bloque de texto plano<br/>64 bits"] --> IP["Permutación inicial IP"]
+        IP --> SPLIT["Dividir en L0 y R0<br/>(32 bits cada una)"]
+        SPLIT --> INIT["i = 1"]
+        INIT --> F["f(R<sub>i-1</sub>, K<sub>i</sub>)<br/>E: 32 → 48 bits<br/>⊕ K<sub>i</sub> (del generador)<br/>8 cajas S: 48 → 32 bits<br/>Permutación P"]
+        F --> ROUND["L<sub>i</sub> = R<sub>i-1</sub><br/>R<sub>i</sub> = L<sub>i-1</sub> ⊕ f(R<sub>i-1</sub>, K<sub>i</sub>)"]
+        ROUND --> Q{"¿i = 16?"}
+        Q -- "no: i = i + 1" --> F
+        Q -- "sí" --> SWAP["Intercambio final<br/>R16 ‖ L16"]
+        SWAP --> FP["Permutación final IP⁻¹"]
+        FP --> OUT["Bloque cifrado<br/>64 bits"]
+    end
+
+    subgraph SUB["Generador de subllaves"]
+        direction TB
+        K["Llave de 64 bits<br/>(56 efectivos + 8 de paridad)"] --> PC1["PC-1: 64 → 56 bits<br/>(descarta la paridad)"]
+        PC1 --> CD["Dividir en C0 y D0<br/>(28 bits cada una)"]
+        CD --> ROT["Rotación a la izquierda<br/>de C y D (1 o 2 posiciones)"]
+        ROT --> PC2["PC-2: 56 → 48 bits"]
+        PC2 --> KI["Subllave K<sub>i</sub> → ronda i<br/>(K1 … K16; para descifrar<br/>se usan en orden K16 … K1)"]
+        PC2 -. "siguiente ronda" .-> ROT
+    end
+
+    CIF ~~~ SUB
