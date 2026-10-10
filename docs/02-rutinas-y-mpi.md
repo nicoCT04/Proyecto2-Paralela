@@ -4,14 +4,9 @@
 
 El `bruteforce.c` del curso incluye `<rpc/des_crypt.h>` y usa `ecb_crypt` y `des_setparity`.
 Esas funciones eran parte de la implementación de **Sun RPC** que venía dentro de la
-biblioteca de C de GNU (glibc). glibc la fue retirando por pasos [1], [2]:
-
-- **glibc 2.26 (2017)** dejó de instalar por defecto las cabeceras de Sun RPC; solo se
-  instalaban si glibc se compilaba con `--enable-obsolete-rpc`. Varias distribuciones, como
-  Fedora 28, las quitaron entonces.
-- **glibc 2.32 (2020)** eliminó por completo Sun RPC, la opción `--enable-obsolete-rpc`,
-  `rpcgen` y sus cabeceras. Lo recomendado desde entonces es la biblioteca externa
-  **libtirpc**, que no viene instalada por defecto.
+biblioteca de C de GNU (glibc). En **glibc 2.32 (2020)** se eliminó por completo Sun RPC,
+junto con `rpcgen` y sus cabeceras [1], [2]. Lo recomendado desde entonces es la biblioteca
+externa **libtirpc**, que no viene instalada por defecto.
 
 El motivo fue que esa implementación no soportaba IPv6 y arreglarlo exigía romper la ABI [1].
 Por eso, en una distribución moderna (Ubuntu 22.04 o más nuevo, Arch, Fedora) `#include
@@ -152,10 +147,11 @@ encontrada».
 ## Referencias
 
 [1] Fedora Project, «Changes/SunRPCRemoval: Removal of Sun RPC Interfaces From glibc», *Fedora
-Project Wiki*, 2018. Disponible: https://fedoraproject.org/wiki/Changes/SunRPCRemoval
+Project Wiki*. Disponible: https://fedoraproject.org/wiki/Changes/SunRPCRemoval
 
-[2] The GNU C Library, «NEWS: Version 2.26» y «NEWS: Version 2.32», Free Software Foundation,
-2017 y 2020.
+[2] F. Weimer, «[PATCH] Remove --enable-obsolete-rpc configure flag», lista de correo
+*libc-alpha*, julio de 2020. Disponible:
+https://inbox.sourceware.org/libc-alpha/20200711181508.GA9224@x230/t
 
 [3] OpenSSL Project, «DES_random_key, DES_set_key, DES_ecb_encrypt…: DES encryption», *OpenSSL 3
 Manual Pages*. Disponible: https://docs.openssl.org/3.0/man3/DES_random_key/
