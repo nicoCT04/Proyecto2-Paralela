@@ -128,28 +128,41 @@ void problem_print_header(const char *program, const program_options_t *opts,
 }
 
 void problem_print_result(const char *program, const program_options_t *opts,
-                          const crack_problem_t *problem, int processes,
-                          uint64_t found_key, int finder_rank,
-                          uint64_t iterations, double elapsed_s)
+                          const crack_problem_t *problem, const search_result_t *result)
 {
-    unsigned char *plain = malloc(problem->cipher_length + 1);
-    if (plain != NULL) {
-        memcpy(plain, problem->cipher, problem->cipher_length);
-        plain[problem->cipher_length] = '\0';
-        decrypt_des(found_key, plain, problem->cipher_length);
-    }
+    double rate = result->elapsed_s > 0.0 ? (double)result->total_keys / result->elapsed_s : 0.0;
 
-    printf("Llave posible    : %llu%s\n", (unsigned long long)found_key,
-           found_key == opts->key ? "" : "  (distinta a la real: falso positivo de la frase)");
-    printf("Encontrada por   : proceso %d, tras %llu intentos propios\n",
-           finder_rank, (unsigned long long)iterations);
-    printf("Texto descifrado : \"%s\"\n", plain != NULL ? (char *)plain : "(sin memoria)");
-    printf("Tiempo           : %.6f s\n", elapsed_s);
-    printf("CSV,%s,%d,%d,%llu,%llu,%d,%llu,%.6f\n", program, processes, problem->key_bits,
-           (unsigned long long)opts->key, (unsigned long long)found_key, finder_rank,
-           (unsigned long long)iterations, elapsed_s);
+    if (result->found) {
+        unsigned char *plain = malloc(problem->cipher_length + 1);
+        if (plain != NULL) {
+            memcpy(plain, problem->cipher, problem->cipher_length);
+            plain[problem->cipher_length] = '\0';
+            decrypt_des(result->found_key, plain, problem->cipher_length);
+        }
+        printf("Llave posible    : %llu%s\n", (unsigned long long)result->found_key,
+               result->found_key == opts->key ? "" : "  (distinta a la real: falso positivo de la frase)");
+        printf("Encontrada por   : proceso %d, tras %llu intentos propios\n",
+               result->finder_rank, (unsigned long long)result->iterations);
+        printf("Texto descifrado : \"%s\"\n", plain != NULL ? (char *)plain : "(sin memoria)");
+        free(plain);
+    } else {
+        printf("Llave posible    : no encontrada en el límite de %d s\n", opts->time_limit_s);
+    }
+    printf("Llaves probadas  : %llu (%.0f llaves/s)\n", (unsigned long long)result->total_keys, rate);
+    printf("Tiempo           : %.6f s\n", result->elapsed_s);
+
+    char found_text[24];
+    if (result->found) {
+        snprintf(found_text, sizeof(found_text), "%llu", (unsigned long long)result->found_key);
+    } else {
+        snprintf(found_text, sizeof(found_text), "NA");
+    }
+    printf("CSV,%s,%d,%d,%d,%llu,%s,%d,%llu,%llu,%.6f\n", program, result->processes,
+           result->threads, problem->key_bits, (unsigned long long)opts->key, found_text,
+           result->found ? result->finder_rank : -1,
+           (unsigned long long)(result->found ? result->iterations : 0),
+           (unsigned long long)result->total_keys, result->elapsed_s);
     fflush(stdout);
-    free(plain);
 }
 
 void print_hex(const char *label, const unsigned char *bytes, size_t length)

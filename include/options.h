@@ -8,6 +8,7 @@
  *                      (a, b, c, facil, media, dificil)
  *   -p <frase>         frase clave a buscar (por defecto "es una prueba de")
  *   -b <bits>          tamaño del espacio de llaves, 2^bits (8..56, por defecto 56)
+ *   -t <segundos>      límite de tiempo de la búsqueda (0 = sin límite)
  *   -o <archivo>       (solo `cifrar`) guarda el texto cifrado en binario
  */
 #ifndef OPTIONS_H
@@ -18,6 +19,7 @@
 #define DEFAULT_PHRASE   "es una prueba de"
 #define MIN_KEY_BITS     8
 #define MAX_PHRASE_BYTES 256
+#define MAX_TIME_LIMIT_S 86400
 
 /** Resultado de parse_options. */
 enum {
@@ -33,6 +35,7 @@ typedef struct {
     uint64_t    key;          /**< La llave ya resuelta a número. */
     const char *phrase;       /**< Frase clave a buscar. */
     int         key_bits;     /**< Bits del espacio de búsqueda. */
+    int         time_limit_s; /**< Límite de la búsqueda en segundos (0 = sin límite). */
     const char *output_path;  /**< Archivo de salida del cifrado (puede ser NULL). */
 } program_options_t;
 

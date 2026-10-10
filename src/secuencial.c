@@ -8,6 +8,7 @@
  *
  * Ejemplo:  ./bin/secuencial -f data/texto.txt -k 123456
  *           ./bin/secuencial -f data/texto.txt -k facil -b 24
+ *           ./bin/secuencial -f data/texto.txt -k b -t 120
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,29 +39,38 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    uint64_t found_key = 0;
-    uint64_t iterations = 0;
-    int found = 0;
+    search_result_t result = {0};
+    result.finder_rank = -1;
+    result.processes   = 1;
+    result.threads     = 1;
 
     double start = wall_seconds();
+    double deadline = opts.time_limit_s > 0 ? start + opts.time_limit_s : 0.0;
     for (uint64_t key = 0; key < problem.key_space; ++key) {
-        ++iterations;
+        if (deadline > 0.0 && (result.iterations & (POLL_INTERVAL - 1)) == 0
+            && wall_seconds() >= deadline) {
+            break;
+        }
+        ++result.iterations;
         if (try_key(key, problem.cipher, problem.cipher_length, problem.phrase, workspace)) {
-            found_key = key;
-            found = 1;
+            result.found_key   = key;
+            result.finder_rank = 0;
+            result.found       = 1;
             break;
         }
     }
-    double elapsed = wall_seconds() - start;
+    result.elapsed_s  = wall_seconds() - start;
+    result.total_keys = result.iterations;
 
-    if (found) {
-        problem_print_result("secuencial", &opts, &problem, 1, found_key, 0, iterations, elapsed);
+    if (result.found || deadline > 0.0) {
+        problem_print_result("secuencial", &opts, &problem, &result);
     } else {
         /* No debería pasar: la llave real siempre está dentro del espacio. */
-        printf("No se encontró la llave en 2^%d intentos (%.6f s).\n", problem.key_bits, elapsed);
+        printf("No se encontró la llave en 2^%d intentos (%.6f s).\n", problem.key_bits,
+               result.elapsed_s);
     }
 
     free(workspace);
     problem_release(&problem);
-    return found ? EXIT_SUCCESS : EXIT_FAILURE;
+    return result.found || deadline > 0.0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -13,7 +13,7 @@ BITS=("$@")
 OUT=resultados/secuencial_longitudes.csv
 
 mkdir -p resultados
-echo "programa,procesos,bits,llave_real,llave_hallada,proceso,iteraciones,tiempo_s" > "$OUT"
+echo "programa,procesos,hilos,bits,llave_real,llave_hallada,proceso,iteraciones,llaves_totales,tiempo_s" > "$OUT"
 for bits in "${BITS[@]}"; do
     key=$(( (1 << bits) - 1 ))
     ./bin/secuencial -f data/texto.txt -k "$key" -b "$bits" | grep '^CSV,' | cut -d, -f2- | tee -a "$OUT"

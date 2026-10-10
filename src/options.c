@@ -20,7 +20,7 @@
 static void print_usage(const char *program, int accepts_output)
 {
     fprintf(stderr,
-            "Uso: %s -f <archivo.txt> -k <llave> [-p \"frase clave\"] [-b bits]%s\n"
+            "Uso: %s -f <archivo.txt> -k <llave> [-p \"frase clave\"] [-b bits] [-t segundos]%s\n"
             "\n"
             "  -f  archivo .txt con el texto plano a cifrar\n"
             "  -k  llave privada: número (decimal o 0x...) o preset:\n"
@@ -29,10 +29,11 @@ static void print_usage(const char *program, int accepts_output)
             "        dificil = ceil(2^bits/7 + 2^bits/13)\n"
             "  -p  frase clave que debe aparecer en el texto (por defecto \"%s\")\n"
             "  -b  bits del espacio de llaves, %d..%d (por defecto %d)\n"
+            "  -t  límite de tiempo de la búsqueda en segundos, 0..%d (0 = sin límite)\n"
             "%s"
             "  -h  muestra esta ayuda\n",
             program, accepts_output ? " [-o salida.bin]" : "",
-            DEFAULT_PHRASE, MIN_KEY_BITS, DES_KEY_BITS, DES_KEY_BITS,
+            DEFAULT_PHRASE, MIN_KEY_BITS, DES_KEY_BITS, DES_KEY_BITS, MAX_TIME_LIMIT_S,
             accepts_output ? "  -o  guarda el texto cifrado en un archivo binario\n" : "");
 }
 
@@ -100,7 +101,7 @@ int resolve_key(const char *text, int key_bits, uint64_t *key_out)
 int parse_options(int argc, char **argv, const char *program,
                   int accepts_output, program_options_t *opts)
 {
-    const char *optstring = accepts_output ? "f:k:p:b:o:h" : "f:k:p:b:h";
+    const char *optstring = accepts_output ? "f:k:p:b:t:o:h" : "f:k:p:b:t:h";
     int option;
 
     opts->text_path   = NULL;
@@ -108,6 +109,7 @@ int parse_options(int argc, char **argv, const char *program,
     opts->key         = 0;
     opts->phrase      = DEFAULT_PHRASE;
     opts->key_bits    = DES_KEY_BITS;
+    opts->time_limit_s = 0;
     opts->output_path = NULL;
 
     opterr = 0;  /* Los mensajes de error los damos nosotros, en español. */
@@ -125,6 +127,16 @@ int parse_options(int argc, char **argv, const char *program,
                 return OPTIONS_ERROR;
             }
             opts->key_bits = (int)bits;
+            break;
+        }
+        case 't': {
+            uint64_t seconds;
+            if (parse_u64(optarg, &seconds) != 0 || seconds > MAX_TIME_LIMIT_S) {
+                fprintf(stderr, "Error: -t debe estar entre 0 y %d segundos (se recibió \"%s\").\n",
+                        MAX_TIME_LIMIT_S, optarg);
+                return OPTIONS_ERROR;
+            }
+            opts->time_limit_s = (int)seconds;
             break;
         }
         case 'h':

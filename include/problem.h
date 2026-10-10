@@ -6,7 +6,9 @@
  * Los programas de búsqueda imprimen al final una línea que empieza con
  * "CSV," para que la bitácora de pruebas se arme con un simple
  * `grep '^CSV,'`. Columnas:
- *   CSV,programa,procesos,bits,llave_real,llave_hallada,proceso,iteraciones,tiempo_s
+ *   CSV,programa,procesos,hilos,bits,llave_real,llave_hallada,proceso,iteraciones,
+ *       llaves_totales,tiempo_s
+ * Si no se halló la llave: llave_hallada = NA, proceso = -1, iteraciones = 0.
  */
 #ifndef PROBLEM_H
 #define PROBLEM_H
@@ -18,6 +20,9 @@
 
 /** Tamaño máximo del texto a cifrar: más texto solo vuelve más lento cada intento. */
 #define MAX_TEXT_BYTES (64 * 1024)
+
+/** Cada cuántas llaves se revisan los mensajes MPI y el límite de tiempo (potencia de 2). */
+#define POLL_INTERVAL 4096
 
 /** Datos que necesita la búsqueda de la llave. */
 typedef struct {
@@ -54,21 +59,27 @@ void problem_release(crack_problem_t *problem);
 void problem_print_header(const char *program, const program_options_t *opts,
                           const crack_problem_t *problem, int processes);
 
+/** Resultado de una búsqueda tal como lo reporta el proceso 0. */
+typedef struct {
+    int      found;        /**< 1 si se halló la llave, 0 si se agotó el límite de tiempo. */
+    uint64_t found_key;    /**< Llave hallada (solo si found). */
+    int      finder_rank;  /**< Proceso que la halló (-1 si no se halló). */
+    uint64_t iterations;   /**< Llaves que probó ese proceso hasta hallarla. */
+    uint64_t total_keys;   /**< Llaves probadas entre todos los procesos e hilos. */
+    int      processes;    /**< Procesos MPI (1 en el secuencial). */
+    int      threads;      /**< Hilos por proceso (1 sin OpenMP). */
+    double   elapsed_s;    /**< Tiempo de pared de la búsqueda, en segundos. */
+} search_result_t;
+
 /**
  * @brief  Imprime el resultado de la búsqueda y la línea CSV para la bitácora.
- * @param  program       Nombre del programa.
- * @param  opts          Parámetros de la corrida (para la llave real).
- * @param  problem       Problema (se usa para descifrar y mostrar el texto).
- * @param  processes     Número de procesos.
- * @param  found_key     Llave encontrada.
- * @param  finder_rank   Proceso que la encontró.
- * @param  iterations    Llaves que probó ese proceso hasta encontrarla.
- * @param  elapsed_s     Tiempo de búsqueda en segundos.
+ * @param  program  Nombre del programa.
+ * @param  opts     Parámetros de la corrida (para la llave real y el límite de tiempo).
+ * @param  problem  Problema (se usa para descifrar y mostrar el texto).
+ * @param  result   Resultado de la búsqueda.
  */
 void problem_print_result(const char *program, const program_options_t *opts,
-                          const crack_problem_t *problem, int processes,
-                          uint64_t found_key, int finder_rank,
-                          uint64_t iterations, double elapsed_s);
+                          const crack_problem_t *problem, const search_result_t *result);
 
 /**
  * @brief  Imprime un buffer en hexadecimal, de 8 en 8 bytes (un bloque DES).
