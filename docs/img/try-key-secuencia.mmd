@@ -1,0 +1,20 @@
+%% Diagrama de secuencia de un intento de llave (try_key).
+%% Generar el PNG:  npx -y @mermaid-js/mermaid-cli -i docs/img/try-key-secuencia.mmd -o docs/img/try-key-secuencia.png -s 2 -b white
+sequenceDiagram
+    participant B as Bucle de búsqueda
+    participant T as try_key
+    participant D as decrypt_des / run_des
+    participant O as OpenSSL (libcrypto)
+
+    B->>T: try_key(key, cipher, length, phrase, workspace)
+    T->>T: memcpy(workspace, cipher, length)<br/>workspace[length] = '\0'
+    T->>D: decrypt_des(key, workspace, length)
+    D->>D: build_des_key(key): 7 bits por byte
+    D->>O: DES_set_odd_parity(llave)
+    D->>O: DES_set_key_unchecked(llave, agenda)<br/>(16 subllaves de 48 bits)
+    loop cada bloque de 8 bytes (ECB)
+        D->>O: DES_ecb_encrypt(bloque, bloque, agenda, DES_DECRYPT)
+    end
+    D-->>T: workspace descifrado (in-place)
+    T->>T: strstr(workspace, phrase)
+    T-->>B: 1 si aparece la frase, 0 si no

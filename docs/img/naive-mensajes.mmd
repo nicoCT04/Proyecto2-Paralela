@@ -1,0 +1,26 @@
+%% Flujo de mensajes del naive con 4 procesos cuando el proceso 1 halla la llave.
+%% Generar el PNG:  npx -y @mermaid-js/mermaid-cli -i docs/img/naive-mensajes.mmd -o docs/img/naive-mensajes.png -s 2 -b white
+sequenceDiagram
+    participant P0 as Proceso 0
+    participant P1 as Proceso 1
+    participant P2 as Proceso 2
+    participant P3 as Proceso 3
+
+    Note over P0: parse_options + problem_prepare<br/>(lee el .txt y cifra)
+    P0->>P1: MPI_Bcast(encabezado, cifrado, frase)
+    P0->>P2: MPI_Bcast
+    P0->>P3: MPI_Bcast
+    Note over P0,P3: Cada uno: MPI_Irecv(found_msg, ANY_SOURCE, FOUND_TAG) = "antena"
+    Note over P0,P3: MPI_Barrier y start = MPI_Wtime()
+    Note over P0,P3: Cada uno recorre su bloque con try_key<br/>y llama MPI_Test cada 4096 llaves
+    Note over P1: try_key(llave) = 1
+    P1->>P0: MPI_Send({llave, 1, iteraciones})
+    P1->>P1: MPI_Send (a sí mismo)
+    P1->>P2: MPI_Send
+    P1->>P3: MPI_Send
+    Note over P0,P3: Siguiente MPI_Test: done = 1 y salen del bucle
+    Note over P0,P3: MPI_Wait(request) y elapsed = MPI_Wtime() - start
+    P1->>P0: MPI_Reduce(iteraciones, SUM)
+    P2->>P0: MPI_Reduce
+    P3->>P0: MPI_Reduce
+    Note over P0: problem_print_result<br/>(llave, proceso 1, tiempo, CSV)
