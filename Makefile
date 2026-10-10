@@ -1,10 +1,11 @@
 # Proyecto 2 · Computación Paralela y Distribuida (UVG)
 #
-#   make         compila todos los programas
+#   make         compila todos los programas (los de MPI con mpicc)
 #   make demo    Parte B.1: cifra y descifra data/texto.txt con la llave 42
 #   make clean   borra bin/ y obj/
 
 CC      ?= gcc
+MPICC   ?= mpicc
 UNAME_S := $(shell uname -s)
 
 # OPENSSL_SUPPRESS_DEPRECATED: la API DES de OpenSSL 3 está marcada como
@@ -28,14 +29,18 @@ CFLAGS   += -std=c11 -Wall -Wextra -Wpedantic
 COMMON_SRC := src/des_utils.c src/options.c src/problem.c
 COMMON_OBJ := $(COMMON_SRC:src/%.c=obj/%.o)
 SEQ_BIN    := bin/cifrar bin/secuencial
+MPI_BIN    := bin/naive
 
 .PHONY: all demo clean
 .SECONDARY:
 
-all: $(SEQ_BIN)
+all: $(SEQ_BIN) $(MPI_BIN)
 
 $(SEQ_BIN): bin/%: obj/%.o $(COMMON_OBJ) | bin
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+$(MPI_BIN): bin/%: src/%.c $(COMMON_OBJ) $(wildcard include/*.h) | bin
+	$(MPICC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(filter %.c %.o,$^) $(LDLIBS)
 
 obj/%.o: src/%.c $(wildcard include/*.h) | obj
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
