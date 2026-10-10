@@ -27,7 +27,7 @@ CFLAGS   += -std=c11 -Wall -Wextra -Wpedantic
 
 COMMON_SRC := src/des_utils.c src/options.c src/problem.c
 COMMON_OBJ := $(COMMON_SRC:src/%.c=obj/%.o)
-SEQ_BIN    := bin/cifrar
+SEQ_BIN    := bin/cifrar bin/secuencial
 
 .PHONY: all demo clean
 .SECONDARY:
