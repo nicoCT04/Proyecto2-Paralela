@@ -22,13 +22,13 @@ En macOS el `Makefile` toma OpenSSL de Homebrew (`brew --prefix openssl@3`).
 ## Compilar
 
 ```bash
-make          # compila bin/cifrar y bin/secuencial
+make          # compila bin/cifrar, bin/secuencial y bin/naive (con mpicc)
 make clean    # borra lo compilado
 ```
 
 ## Programas
 
-Ambos aceptan los mismos parámetros:
+Todos aceptan los mismos parámetros:
 
 | Opción | Significado | Por defecto |
 |---|---|---|
@@ -36,6 +36,7 @@ Ambos aceptan los mismos parámetros:
 | `-k <llave>` | llave privada: número (`123456`, `123456L`, `0x1E240`) o preset | obligatorio |
 | `-p "<frase>"` | frase clave que confirma el descifrado | `"es una prueba de"` |
 | `-b <bits>` | espacio de búsqueda de 2^bits llaves (8..56) | `56` |
+| `-t <segundos>` | (búsquedas) límite de tiempo; al vencer se reporta «no encontrada» | `0` (sin límite) |
 | `-o <archivo>` | (solo `cifrar`) guarda el texto cifrado en binario | — |
 
 Presets de llave (con N = 2^bits, así se escalan si se reduce `-b`):
@@ -66,15 +67,42 @@ qué sale con una llave errónea.
 ```
 
 Imprime el archivo, la frase clave, la llave posible, el texto descifrado y el
-tiempo; al final deja una línea `CSV,...` para la bitácora.
+tiempo; al final deja una línea `CSV,...` para la bitácora:
+
+```
+CSV,programa,procesos,hilos,bits,llave_real,llave_hallada,proceso,iteraciones,llaves_totales,tiempo_s
+```
+
+Si se agota el límite `-t`, `llave_hallada` es `NA` y `proceso` es `-1`.
+
+### `naive`: fuerza bruta con MPI en bloques contiguos (Parte B.2)
+
+```bash
+mpirun -np 4 ./bin/naive -f data/texto.txt -k 123456
+mpirun -np 4 ./bin/naive -f data/texto.txt -k media -b 24
+mpirun -np 4 ./bin/naive -f data/texto.txt -k b -t 120
+```
+
+Es la versión del `bruteforce.c` del curso: el espacio de llaves se parte en
+bloques contiguos, uno por proceso. Solo el proceso 0 lee el archivo y cifra;
+el resto recibe el problema con `MPI_Bcast`. Quien halla la llave avisa a todos
+con `MPI_Send`, y cada proceso lo detecta con `MPI_Irecv` + `MPI_Test` (cada
+4096 llaves) y lo cierra con `MPI_Wait`.
+
+En Linux, si `mpirun` reclama falta de *slots*, se agrega `--oversubscribe`
+(no para medir tiempos).
 
 ## Mediciones
 
 ```bash
 scripts/medir_longitudes.sh         # A.3: secuencial con llaves de 16..26 bits
+scripts/pruebas_b2.sh               # B.2: llaves a, b y c, secuencial vs naive -np 4
+NP=4 LIMIT=120 scripts/pruebas_b2.sh  # mismas pruebas con procesos y límite explícitos
 ```
 
-Los resultados quedan en `resultados/secuencial_longitudes.csv`.
+Los resultados quedan en `resultados/secuencial_longitudes.csv` y
+`resultados/pruebas_b2.csv`. Con 56 bits las llaves b y c no terminan en el
+secuencial, así que el script usa el límite `-t` y las repite con `-b 28`.
 
 ## Estructura
 
@@ -82,8 +110,8 @@ Los resultados quedan en `resultados/secuencial_longitudes.csv`.
 include/  des_utils.h   DES con OpenSSL: encrypt_des, decrypt_des, try_key
           options.h     parámetros y presets de llave
           problem.h     carga del .txt, cifrado inicial y reporte
-src/      cifrar.c  secuencial.c  (+ implementación de los .h)
-scripts/  medir_longitudes.sh
+src/      cifrar.c  secuencial.c  naive.c  (+ implementación de los .h)
+scripts/  medir_longitudes.sh  pruebas_b2.sh
 data/     texto.txt     "Esta es una prueba de proyecto 2"
 resultados/             CSV de las corridas
 ```
