@@ -14,13 +14,13 @@
 
 /**
  * @brief  Imprime la forma de uso del programa.
- * @param  program         Nombre del programa.
- * @param  accepts_output  1 si el programa admite -o.
+ * @param  program  Nombre del programa.
+ * @param  flags    Opciones extra que admite (OPT_OUTPUT, OPT_CHUNK).
  */
-static void print_usage(const char *program, int accepts_output)
+static void print_usage(const char *program, int flags)
 {
     fprintf(stderr,
-            "Uso: %s -f <archivo.txt> -k <llave> [-p \"frase clave\"] [-b bits] [-t segundos]%s\n"
+            "Uso: %s -f <archivo.txt> -k <llave> [-p \"frase clave\"] [-b bits] [-t segundos]%s%s\n"
             "\n"
             "  -f  archivo .txt con el texto plano a cifrar\n"
             "  -k  llave privada: número (decimal o 0x...) o preset:\n"
@@ -29,12 +29,20 @@ static void print_usage(const char *program, int accepts_output)
             "        dificil = ceil(2^bits/7 + 2^bits/13)\n"
             "  -p  frase clave que debe aparecer en el texto (por defecto \"%s\")\n"
             "  -b  bits del espacio de llaves, %d..%d (por defecto %d)\n"
-            "  -t  límite de tiempo de la búsqueda en segundos, 0..%d (0 = sin límite)\n"
-            "%s"
-            "  -h  muestra esta ayuda\n",
-            program, accepts_output ? " [-o salida.bin]" : "",
-            DEFAULT_PHRASE, MIN_KEY_BITS, DES_KEY_BITS, DES_KEY_BITS, MAX_TIME_LIMIT_S,
-            accepts_output ? "  -o  guarda el texto cifrado en un archivo binario\n" : "");
+            "  -t  límite de tiempo de la búsqueda en segundos, 0..%d (0 = sin límite)\n",
+            program, (flags & OPT_CHUNK) ? " [-c bits]" : "",
+            (flags & OPT_OUTPUT) ? " [-o salida.bin]" : "",
+            DEFAULT_PHRASE, MIN_KEY_BITS, DES_KEY_BITS, DES_KEY_BITS, MAX_TIME_LIMIT_S);
+    if (flags & OPT_CHUNK) {
+        fprintf(stderr,
+                "  -c  chunk de 2^bits llaves, %d..%d y menor que -b (por defecto %d);\n"
+                "      solo ciclico y maestro_trabajador\n",
+                MIN_CHUNK_BITS, MAX_CHUNK_BITS, DEFAULT_CHUNK_BITS);
+    }
+    if (flags & OPT_OUTPUT) {
+        fprintf(stderr, "  -o  guarda el texto cifrado en un archivo binario\n");
+    }
+    fprintf(stderr, "  -h  muestra esta ayuda\n");
 }
 
 /**
@@ -99,9 +107,16 @@ int resolve_key(const char *text, int key_bits, uint64_t *key_out)
 }
 
 int parse_options(int argc, char **argv, const char *program,
-                  int accepts_output, program_options_t *opts)
+                  int flags, program_options_t *opts)
 {
-    const char *optstring = accepts_output ? "f:k:p:b:t:o:h" : "f:k:p:b:t:h";
+    /* Las opciones extra solo entran al optstring si el programa las admite. */
+    char optstring[32] = "f:k:p:b:t:h";
+    if (flags & OPT_OUTPUT) {
+        strcat(optstring, "o:");
+    }
+    if (flags & OPT_CHUNK) {
+        strcat(optstring, "c:");
+    }
     int option;
 
     opts->text_path   = NULL;
@@ -110,6 +125,7 @@ int parse_options(int argc, char **argv, const char *program,
     opts->phrase      = DEFAULT_PHRASE;
     opts->key_bits    = DES_KEY_BITS;
     opts->time_limit_s = 0;
+    opts->chunk_bits  = DEFAULT_CHUNK_BITS;
     opts->output_path = NULL;
 
     opterr = 0;  /* Los mensajes de error los damos nosotros, en español. */
@@ -139,19 +155,35 @@ int parse_options(int argc, char **argv, const char *program,
             opts->time_limit_s = (int)seconds;
             break;
         }
+        case 'c': {
+            uint64_t bits;
+            if (parse_u64(optarg, &bits) != 0 || bits < MIN_CHUNK_BITS || bits > MAX_CHUNK_BITS) {
+                fprintf(stderr, "Error: -c debe estar entre %d y %d (se recibió \"%s\").\n",
+                        MIN_CHUNK_BITS, MAX_CHUNK_BITS, optarg);
+                return OPTIONS_ERROR;
+            }
+            opts->chunk_bits = (int)bits;
+            break;
+        }
         case 'h':
-            print_usage(program, accepts_output);
+            print_usage(program, flags);
             return OPTIONS_HELP;
         default:
             fprintf(stderr, "Error: opción -%c desconocida o sin valor.\n\n", optopt);
-            print_usage(program, accepts_output);
+            print_usage(program, flags);
             return OPTIONS_ERROR;
         }
     }
 
     if (opts->text_path == NULL || opts->key_text == NULL) {
         fprintf(stderr, "Error: -f y -k son obligatorios.\n\n");
-        print_usage(program, accepts_output);
+        print_usage(program, flags);
+        return OPTIONS_ERROR;
+    }
+    /* Con un solo chunk (o ninguno) no hay nada que repartir. */
+    if ((flags & OPT_CHUNK) && opts->chunk_bits >= opts->key_bits) {
+        fprintf(stderr, "Error: el chunk (-c %d) debe ser menor que el espacio (-b %d).\n",
+                opts->chunk_bits, opts->key_bits);
         return OPTIONS_ERROR;
     }
     if (opts->phrase[0] == '\0') {

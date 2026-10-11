@@ -9,6 +9,7 @@
  *   -p <frase>         frase clave a buscar (por defecto "es una prueba de")
  *   -b <bits>          tamaño del espacio de llaves, 2^bits (8..56, por defecto 56)
  *   -t <segundos>      límite de tiempo de la búsqueda (0 = sin límite)
+ *   -c <bits>          (solo `ciclico` y `maestro_trabajador`) chunk de 2^bits llaves
  *   -o <archivo>       (solo `cifrar`) guarda el texto cifrado en binario
  */
 #ifndef OPTIONS_H
@@ -20,6 +21,16 @@
 #define MIN_KEY_BITS     8
 #define MAX_PHRASE_BYTES 256
 #define MAX_TIME_LIMIT_S 86400
+
+#define DEFAULT_CHUNK_BITS 16
+#define MIN_CHUNK_BITS     8
+#define MAX_CHUNK_BITS     30
+
+/** Opciones extra que admite cada programa (se combinan con |). */
+enum {
+    OPT_OUTPUT = 1 << 0,   /**< -o: guardar el cifrado (cifrar). */
+    OPT_CHUNK  = 1 << 1    /**< -c: tamaño de chunk (ciclico, maestro_trabajador). */
+};
 
 /** Resultado de parse_options. */
 enum {
@@ -36,19 +47,20 @@ typedef struct {
     const char *phrase;       /**< Frase clave a buscar. */
     int         key_bits;     /**< Bits del espacio de búsqueda. */
     int         time_limit_s; /**< Límite de la búsqueda en segundos (0 = sin límite). */
+    int         chunk_bits;   /**< Tamaño de chunk: 2^chunk_bits llaves (con OPT_CHUNK). */
     const char *output_path;  /**< Archivo de salida del cifrado (puede ser NULL). */
 } program_options_t;
 
 /**
  * @brief  Lee y valida argv.
- * @param  argc, argv      Argumentos del programa.
- * @param  program         Nombre del programa (para la ayuda).
- * @param  accepts_output  1 si el programa admite -o.
- * @param  opts            Salida: parámetros validados.
+ * @param  argc, argv  Argumentos del programa.
+ * @param  program     Nombre del programa (para la ayuda).
+ * @param  flags       Opciones extra que admite: 0 o una combinación de OPT_OUTPUT y OPT_CHUNK.
+ * @param  opts        Salida: parámetros validados.
  * @return OPTIONS_OK, OPTIONS_HELP u OPTIONS_ERROR.
  */
 int parse_options(int argc, char **argv, const char *program,
-                  int accepts_output, program_options_t *opts);
+                  int flags, program_options_t *opts);
 
 /**
  * @brief  Convierte el texto de -k en una llave numérica.

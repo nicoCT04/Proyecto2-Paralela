@@ -19,7 +19,7 @@ int main(int argc, char **argv)
 {
     mpi_search_t search;
 
-    int status = mpi_search_setup(&argc, &argv, "naive", 1, &search);
+    int status = mpi_search_setup(&argc, &argv, "naive", 0, 1, &search);
     if (status != SEARCH_READY) {
         return status == SEARCH_HELP ? EXIT_SUCCESS : EXIT_FAILURE;
     }

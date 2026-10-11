@@ -33,7 +33,8 @@ enum {
 typedef struct {
     int               rank;       /**< Rango de este proceso. */
     int               size;       /**< Número de procesos. */
-    program_options_t opts;       /**< Parámetros; completos solo en el proceso 0 (time_limit_s en todos). */
+    program_options_t opts;       /**< Parámetros; completos solo en el proceso 0
+                                       (time_limit_s y chunk_bits en todos). */
     crack_problem_t   problem;    /**< Cifrado, frase y espacio; el texto plano solo en el proceso 0. */
     unsigned char    *workspace;  /**< Buffer de try_key, reservado una sola vez. */
 } mpi_search_t;
@@ -57,12 +58,13 @@ typedef struct {
  *
  * @param  argc, argv     Argumentos del programa (se pasan a MPI_Init).
  * @param  program        Nombre del programa (para la ayuda y el reporte).
+ * @param  option_flags   Opciones extra que admite (0 u OPT_CHUNK; ver options.h).
  * @param  min_processes  Mínimo de procesos que necesita el programa.
  * @param  search         Salida: estado de la búsqueda (liberar con mpi_search_release).
  * @return SEARCH_READY, SEARCH_HELP o SEARCH_ERROR.
  */
-int mpi_search_setup(int *argc, char ***argv, const char *program, int min_processes,
-                     mpi_search_t *search);
+int mpi_search_setup(int *argc, char ***argv, const char *program, int option_flags,
+                     int min_processes, mpi_search_t *search);
 
 /**
  * @brief  Libera la memoria de la búsqueda y cierra MPI.

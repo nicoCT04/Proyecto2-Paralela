@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     program_options_t opts;
     crack_problem_t problem;
 
-    int status = parse_options(argc, argv, "cifrar", 1, &opts);
+    int status = parse_options(argc, argv, "cifrar", OPT_OUTPUT, &opts);
     if (status != OPTIONS_OK) {
         return status == OPTIONS_HELP ? EXIT_SUCCESS : EXIT_FAILURE;
     }
