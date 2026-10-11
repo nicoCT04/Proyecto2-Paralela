@@ -1,6 +1,7 @@
 # Proyecto 2 · Computación Paralela y Distribuida (UVG)
 #
-#   make         compila todos los programas (los de MPI con mpicc)
+#   make         compila todos los programas: cifrar y secuencial con $(CC);
+#                naive, intercalado, ciclico y maestro_trabajador con mpicc
 #   make demo    Parte B.1: cifra y descifra data/texto.txt con la llave 42
 #   make clean   borra bin/ y obj/
 
