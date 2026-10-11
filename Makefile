@@ -30,7 +30,7 @@ COMMON_SRC := src/des_utils.c src/options.c src/problem.c
 COMMON_OBJ := $(COMMON_SRC:src/%.c=obj/%.o)
 SEQ_BIN    := bin/cifrar bin/secuencial
 MPI_OBJ    := obj/search_mpi.o
-MPI_BIN    := bin/naive bin/intercalado bin/ciclico
+MPI_BIN    := bin/naive bin/intercalado bin/ciclico bin/maestro_trabajador
 
 .PHONY: all demo clean
 .SECONDARY:
