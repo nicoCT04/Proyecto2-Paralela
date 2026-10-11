@@ -1,5 +1,5 @@
 # Proyecto 2 · Fuerza bruta sobre DES
-
+ 
 Computación Paralela y Distribuida · UVG · Ing. Juan Luis García
 Esteban Cárcamo (23016) · Nicolás Concuá (23197) · Diego López (23747)
 
