@@ -1,0 +1,25 @@
+%% Qué llaves prueba cada proceso en los repartos estáticos, con 16 llaves, p = 4 y chunks de C = 2.
+%% Generar el PNG:  npx -y @mermaid-js/mermaid-cli -i docs/img/enfoques-reparto.mmd -o docs/img/enfoques-reparto.png -s 2 -b white
+flowchart LR
+    subgraph NAIVE["Naive: bloques contiguos de N/p"]
+        direction TB
+        N0["P0: 0, 1, 2, 3"]
+        N1["P1: 4, 5, 6, 7"]
+        N2["P2: 8, 9, 10, 11"]
+        N3["P3: 12, 13, 14, 15"]
+    end
+    subgraph INTER["Intercalado: r, r+p, r+2p, ..."]
+        direction TB
+        I0["P0: 0, 4, 8, 12"]
+        I1["P1: 1, 5, 9, 13"]
+        I2["P2: 2, 6, 10, 14"]
+        I3["P3: 3, 7, 11, 15"]
+    end
+    subgraph CICL["Bloque-cíclico (C = 2): chunks r, r+p, ..."]
+        direction TB
+        C0["P0: 0-1, 8-9"]
+        C1["P1: 2-3, 10-11"]
+        C2["P2: 4-5, 12-13"]
+        C3["P3: 6-7, 14-15"]
+    end
+    NAIVE ~~~ INTER ~~~ CICL
