@@ -29,6 +29,7 @@ CFLAGS   += -std=c11 -Wall -Wextra -Wpedantic
 COMMON_SRC := src/des_utils.c src/options.c src/problem.c
 COMMON_OBJ := $(COMMON_SRC:src/%.c=obj/%.o)
 SEQ_BIN    := bin/cifrar bin/secuencial
+MPI_OBJ    := obj/search_mpi.o
 MPI_BIN    := bin/naive
 
 .PHONY: all demo clean
@@ -39,8 +40,13 @@ all: $(SEQ_BIN) $(MPI_BIN)
 $(SEQ_BIN): bin/%: obj/%.o $(COMMON_OBJ) | bin
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-$(MPI_BIN): bin/%: src/%.c $(COMMON_OBJ) $(wildcard include/*.h) | bin
+$(MPI_BIN): bin/%: src/%.c $(COMMON_OBJ) $(MPI_OBJ) $(wildcard include/*.h) | bin
 	$(MPICC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(filter %.c %.o,$^) $(LDLIBS)
+
+# El módulo común de MPI incluye mpi.h: se compila con mpicc y solo se
+# enlaza en los programas MPI.
+$(MPI_OBJ): obj/%.o: src/%.c $(wildcard include/*.h) | obj
+	$(MPICC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 obj/%.o: src/%.c $(wildcard include/*.h) | obj
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
