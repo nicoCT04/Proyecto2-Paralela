@@ -98,36 +98,73 @@ static void run_master(const mpi_search_t *search, search_result_t *result)
 }
 
 /**
+ * @brief  Prueba en orden las llaves de un chunk.
+ * @param  search      Búsqueda.
+ * @param  work        Chunk {primera llave, una más allá de la última}.
+ * @param  iterations  Entrada y salida: llaves probadas por este trabajador.
+ * @param  found_key   Salida: la llave, si se halló.
+ * @return 1 si la halló, 0 si no.
+ */
+static int search_chunk(const mpi_search_t *search, const uint64_t work[WORK_COUNT],
+                        uint64_t *iterations, uint64_t *found_key)
+{
+    for (uint64_t key = work[WORK_FIRST]; key < work[WORK_END]; ++key) {
+        ++*iterations;
+        if (try_key(key, search->problem.cipher, search->problem.cipher_length,
+                    search->problem.phrase, search->workspace)) {
+            *found_key = key;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**
  * @brief  (Procesos 1..p-1) Pide chunks y los prueba hasta recibir STOP.
+ *
+ * Doble buffer: apenas recibe el chunk i pide el i + 1 (MPI_Send + MPI_Irecv),
+ * prueba el i y luego espera el i + 1 con MPI_Wait, así la ida y vuelta con el
+ * maestro se solapa con el cálculo. Cada pedido enviado tiene su recepción en
+ * el código: nunca hay más de dos respuestas pendientes y todas se reciben.
+ *
  * @param  search  Búsqueda.
  * @return Llaves que probó este trabajador.
  */
 static uint64_t run_worker(const mpi_search_t *search)
 {
+    const uint64_t ask[REQ_COUNT] = {STATE_ASK, 0, 0};
     uint64_t iterations = 0;
-    uint64_t request[REQ_COUNT] = {STATE_ASK, 0, 0};
+    uint64_t work[WORK_COUNT];
+    uint64_t next_work[WORK_COUNT];
+    MPI_Status status;
 
     mpi_search_begin();
-    for (;;) {
-        uint64_t work[WORK_COUNT];
-        MPI_Status status;
-        MPI_Send(request, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
-        MPI_Recv(work, WORK_COUNT, MPI_UINT64_T, MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        if (status.MPI_TAG == TAG_STOP) {
+    MPI_Send(ask, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
+    MPI_Recv(work, WORK_COUNT, MPI_UINT64_T, MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+    while (status.MPI_TAG == TAG_WORK) {
+        MPI_Request next_request;
+        MPI_Send(ask, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
+        MPI_Irecv(next_work, WORK_COUNT, MPI_UINT64_T, MASTER, MPI_ANY_TAG, MPI_COMM_WORLD,
+                  &next_request);
+
+        uint64_t found_key;
+        if (search_chunk(search, work, &iterations, &found_key)) {
+            /*
+             * El aviso sale de una vez para no retrasar T_p. Quedan dos respuestas
+             * pendientes; como MPI no adelanta mensajes del mismo origen, la del
+             * pedido adelantado llega al MPI_Irecv y la del aviso (STOP) al MPI_Recv.
+             */
+            const uint64_t report[REQ_COUNT] = {STATE_FOUND, found_key, iterations};
+            MPI_Send(report, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
+            MPI_Wait(&next_request, MPI_STATUS_IGNORE);
+            MPI_Recv(work, WORK_COUNT, MPI_UINT64_T, MASTER, TAG_STOP, MPI_COMM_WORLD,
+                     MPI_STATUS_IGNORE);
             break;
         }
 
-        for (uint64_t key = work[WORK_FIRST]; key < work[WORK_END]; ++key) {
-            ++iterations;
-            if (try_key(key, search->problem.cipher, search->problem.cipher_length,
-                        search->problem.phrase, search->workspace)) {
-                /* El aviso viaja en el siguiente pedido; la respuesta será STOP. */
-                request[REQ_STATE]      = STATE_FOUND;
-                request[REQ_KEY]        = key;
-                request[REQ_ITERATIONS] = iterations;
-                break;
-            }
-        }
+        MPI_Wait(&next_request, &status);
+        memcpy(work, next_work, sizeof(work));
     }
     return iterations;
 }
