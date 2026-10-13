@@ -16,7 +16,7 @@ porque el texto descifrado contiene una frase clave conocida de antemano.
 | Open MPI | `sudo pacman -S openmpi` | `sudo apt install openmpi-bin libopenmpi-dev` | `brew install open-mpi` |
 | OpenMP (híbrido) | viene con gcc | viene con gcc | `brew install libomp` |
 | Análisis (opcional) | `python3` + `matplotlib` | `python3` + `python3-matplotlib` | `python3` + `pip3 install matplotlib` |
-| Informe PDF (opcional) | `chromium`, `python-markdown`, `python-pypdf`, `python-reportlab` | `chromium` + `pip3 install markdown pypdf reportlab` | Google Chrome + `pip3 install markdown pypdf reportlab` |
+| Informe y capturas (opcional) | `chromium`, `python-markdown`, `python-pypdf`, `python-reportlab`, `python-pillow` | `chromium` + `pip3 install markdown pypdf reportlab pillow` | Google Chrome + `pip3 install markdown pypdf reportlab pillow` |
 
 `rpc/des_crypt.h`, que usa el `bruteforce.c` del curso, ya no existe en Linux
 moderno; se reemplazó por la API DES de OpenSSL (`<openssl/des.h>`, `-lcrypto`).
@@ -138,6 +138,7 @@ scripts/verificar.sh                # todos los programas hallan la llave real (
 scripts/campana.sh                  # campaña completa (BITS=28, 5 repeticiones)
 BITS=24 REPS=1 scripts/campana.sh   # campaña corta para probar
 python3 scripts/analizar.py resultados/campana_<host>_<fecha>.csv   # tablas, alertas y gráficas
+python3 scripts/capturas.py         # capturas de las corridas para el Anexo 2
 python3 scripts/informe.py          # arma docs/informe.pdf desde docs/*.md
 ```
 
@@ -169,6 +170,7 @@ scripts/verificar.sh
 ./bin/secuencial -f data/texto.txt -k media -b 28   # calibrar: la campaña tarda ~40× esto
 BITS=28 REPS=5 NP=4 NP_LIST="2 4 8" HYBRID_THREADS="1 2 4" scripts/campana.sh
 python3 scripts/analizar.py resultados/campana_<host>_<fecha>.csv
+python3 scripts/capturas.py
 python3 scripts/informe.py
 ```
 
@@ -187,6 +189,7 @@ src/      cifrar.c  secuencial.c  naive.c  intercalado.c  ciclico.c
           maestro_trabajador.c  hibrido.c  (+ implementación de los .h)
 scripts/  medir_longitudes.sh  pruebas_b2.sh  verificar.sh  campana.sh
           analizar.py   tablas, alertas y gráficas de la campaña
+          capturas.py   capturas de las corridas (docs/capturas/anexo2-*.png)
           informe.py    docs/*.md -> docs/informe.pdf
 data/     texto.txt     "Esta es una prueba de proyecto 2"
 resultados/             CSV de las corridas, ficha de cada máquina y análisis
