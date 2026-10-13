@@ -11,13 +11,18 @@ mismos bits y w = procesos · hilos trabajadores:
     S_rend = (llaves_totales / T_p) / ((llave_real + 1) / T_s)
 
 Deja resultados/analisis_<host>.md con una tabla por llave, el barrido de
-procesos y la consistencia del híbrido, y revisa que todas las corridas hayan
-hallado la llave real.
+procesos, Amdahl y Gustafson, y la consistencia del híbrido. Revisa que todas
+las corridas hayan hallado la llave real y marca con REVISAR lo que rompe la
+regla del proyecto: S > w fuera del naive (superlineal inesperado) o
+S_rend > w en cualquier programa (rendimiento imposible). El S > w del naive es
+aparente (efecto de búsqueda) y solo se etiqueta.
 
 Uso: python3 scripts/analizar.py resultados/campana_<host>_*.csv [-o salida.md]
+Sale con código 1 si hay alguna alerta REVISAR.
 """
 import argparse
 import csv
+import math
 import os
 import re
 import statistics
@@ -26,6 +31,9 @@ from collections import defaultdict
 
 CASE_ORDER = ["a", "b", "c", "facil", "media", "dificil"]
 PROGRAM_ORDER = ["secuencial", "naive", "intercalado", "ciclico", "maestro_trabajador", "hibrido"]
+
+# Margen sobre w antes de alertar: el ruido de medición puede pasar p por poco.
+TOLERANCE = 1.02
 
 
 class Group:
@@ -118,6 +126,45 @@ def metrics(group, t_s):
     }
 
 
+def amdahl_fp(speedup, p):
+    """Fracción paralelizable despejada de Amdahl: f_p = (1 - 1/S) / (1 - 1/p)."""
+    return (1 - 1 / speedup) / (1 - 1 / p)
+
+
+def amdahl_speedup(fp, p):
+    """Speedup de Amdahl con fracción paralelizable fp y p procesadores."""
+    return 1 / ((1 - fp) + fp / p)
+
+
+def gustafson_speedup(fs, p):
+    """Speedup escalado de Gustafson: S = p - f_s (p - 1)."""
+    return p - fs * (p - 1)
+
+
+def ideal_speedup(group):
+    """Speedup ideal del reparto: el maestro-trabajador tiene p - 1 trabajadores."""
+    if group.program == "maestro_trabajador":
+        return group.processes - 1
+    return group.workers
+
+
+def note(group, m, alerts):
+    """Etiqueta de la fila según la regla del superlineal; las alertas se acumulan."""
+    limit = group.workers * TOLERANCE
+    notes = []
+    if group.program == "naive" and m["S"] > limit:
+        notes.append("aparente (búsqueda)")
+    elif m["S"] > limit:
+        notes.append("**REVISAR: superlineal inesperado**")
+        alerts.append(f"superlineal inesperado: {label(group)} -np {group.processes}, "
+                      f"llave {group.case}, S = {fmt(m['S'])} > w = {group.workers}")
+    if m["S_rend"] > limit:
+        notes.append("**REVISAR: rendimiento imposible**")
+        alerts.append(f"rendimiento imposible: {label(group)} -np {group.processes}, "
+                      f"llave {group.case}, S_rend = {fmt(m['S_rend'])} > w = {group.workers}")
+    return ", ".join(notes)
+
+
 def fmt(value, digits=2):
     """Número legible: notación científica si es enorme o diminuto."""
     if value != 0 and (abs(value) >= 1e5 or abs(value) < 10 ** -digits):
@@ -138,15 +185,64 @@ def label(group):
     return group.program
 
 
-def main_table(lines, groups, t_s):
-    lines.append("| Programa | p | h | w | T_p mediana (mín–máx) s | S | E | C (s) | F | S_iter | S_rend |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
+def main_table(lines, groups, t_s, alerts):
+    lines.append("| Programa | p | h | w | T_p mediana (mín–máx) s | S | E | C (s) | F | S_iter | S_rend | Nota |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for group in groups:
         m = metrics(group, t_s)
         lines.append(
             f"| {label(group)} | {group.processes} | {group.threads} | {group.workers} "
             f"| {time_cell(group)} | {fmt(m['S'])} | {fmt(m['E'])} | {fmt(m['C'])} "
-            f"| {fmt(m['F'], 3)} | {fmt(m['S_iter'])} | {fmt(m['S_rend'])} |")
+            f"| {fmt(m['F'], 3)} | {fmt(m['S_iter'])} | {fmt(m['S_rend'])} | {note(group, m, alerts)} |")
+
+
+def amdahl_section(lines, groups, seq, main_np, sweep_case):
+    """f_p por Amdahl con -np main_np, techo 1/f_s y predicción frente al barrido."""
+    lines.append("")
+    lines.append("## Amdahl y Gustafson")
+    lines.append("")
+    lines.append(f"f_p = (1 − 1/S) / (1 − 1/p) con el S medido en -np {main_np}; f_s = 1 − f_p; "
+                 "techo de Amdahl = 1/f_s. Esta «f_s» no es código secuencial (leer y cifrar "
+                 "tardan milisegundos): es la pérdida efectiva por comunicación, sondeo y hardware "
+                 "(turbo, núcleos de rendimiento y de eficiencia). En el maestro-trabajador incluye "
+                 "además al maestro, que no busca. Gustafson (tiempo fijo): en el mismo tiempo se "
+                 "prueban S veces más llaves, es decir, log2(S) bits más.")
+    lines.append("")
+    lines.append("| Programa | Llave | p | S | f_p | f_s | Techo 1/f_s | S Gustafson | Bits extra |")
+    lines.append("|---|---|---|---|---|---|---|---|---|")
+    fractions = {}
+    for g in sorted(groups, key=lambda g: (program_rank(g.program), case_rank(g.case))):
+        if g.program in ("secuencial", "naive", "hibrido") or g.processes != main_np:
+            continue
+        t_s = seq.get((g.case, g.bits))
+        if t_s is None:
+            continue
+        speedup = t_s / g.time
+        fp = amdahl_fp(speedup, g.processes)
+        fs = 1 - fp
+        if g.case == sweep_case:
+            fractions[g.program] = fp
+        ceiling = f"{1 / fs:.1f}" if 0 < fs else "∞"
+        lines.append(f"| {g.program} | {g.case} | {g.processes} | {fmt(speedup)} | {fp:.3f} | "
+                     f"{fs:.3f} | {ceiling} | {fmt(gustafson_speedup(fs, g.processes))} | "
+                     f"{math.log2(speedup):.2f} |")
+
+    sweep = [g for g in groups if g.case == sweep_case and g.program in fractions]
+    swept = {program for program in fractions
+             if len({g.processes for g in sweep if g.program == program}) > 1}
+    sweep = [g for g in sweep if g.program in swept]
+    if sweep:
+        lines.append("")
+        lines.append(f"Predicción de Amdahl para el barrido (llave {sweep_case}, f_p de -np {main_np}):")
+        lines.append("")
+        lines.append("| Programa | p | S medido | S Amdahl | Diferencia | Ideal del enfoque |")
+        lines.append("|---|---|---|---|---|---|")
+        for g in sorted(sweep, key=lambda g: (program_rank(g.program), g.processes)):
+            measured = seq[(g.case, g.bits)] / g.time
+            predicted = amdahl_speedup(fractions[g.program], g.processes)
+            lines.append(f"| {g.program} | {g.processes} | {fmt(measured)} | {fmt(predicted)} | "
+                         f"{(measured - predicted) / predicted * 100:+.1f} % | {ideal_speedup(g)} |")
+    return fractions
 
 
 def analyze(paths, output):
@@ -165,7 +261,9 @@ def analyze(paths, output):
     lines.append(f"- Corridas: {rows} · bits: {', '.join(map(str, bits))} · "
                  f"repeticiones por caso: hasta {reps} (se usa la **mediana**)")
     lines.append(f"- w = procesos · hilos; T_s = mediana del `secuencial` con la misma llave y bits.")
+    alerts_at = len(lines)
     lines.append("")
+    alerts = []
 
     wrong = [g for g in all_groups if g.wrong_keys]
     lines.append("## Verificación de llaves")
@@ -174,6 +272,7 @@ def analyze(paths, output):
         for g in wrong:
             lines.append(f"- **REVISAR: llave equivocada** en {label(g)} -np {g.processes} "
                          f"({g.case}): {g.wrong_keys} corrida(s) no hallaron {g.real_key}.")
+            alerts.append(f"llave equivocada: {label(g)} -np {g.processes}, llave {g.case}")
     else:
         lines.append(f"Las {rows} corridas hallaron la llave real (`llave_hallada == llave_real`).")
     lines.append("")
@@ -194,7 +293,7 @@ def analyze(paths, output):
         lines.append("")
         lines.append(f"### Llave {case} · k = {real_key} · {case_bits} bits · T_s = {t_s:.3f} s")
         lines.append("")
-        main_table(lines, case_groups, t_s)
+        main_table(lines, case_groups, t_s, alerts)
 
     sweep_case = "media"
     sweep = [g for g in groups if g.case == sweep_case and g.program in ("intercalado", "maestro_trabajador")]
@@ -209,7 +308,9 @@ def analyze(paths, output):
             lines.append("")
             lines.append(f"### {program} · T_s = {t_s:.3f} s")
             lines.append("")
-            main_table(lines, series, t_s)
+            main_table(lines, series, t_s, alerts)
+
+    amdahl_section(lines, groups, seq, main_np, sweep_case)
 
     hybrid = [g for g in groups if g.program == "hibrido"]
     if hybrid:
@@ -233,10 +334,18 @@ def analyze(paths, output):
             lines.append(f"| {g.case} | {g.threads} | {g.workers} | {g.time:.3f} | "
                          f"{fmt(t_s / g.time)} | {twin_time} | {ratio} |")
 
+    summary = ["", "**Alertas: ninguna.** Ningún enfoque alternativo pasa de S = w y ningún programa "
+               "prueba llaves más rápido que w veces el secuencial."] if not alerts else \
+              ["", f"**Alertas: {len(alerts)} REVISAR** (ver la regla del superlineal):", ""] + \
+              [f"- REVISAR: {a}" for a in alerts]
+    lines[alerts_at:alerts_at] = summary
+    for alert in alerts:
+        print(f"REVISAR: {alert}", file=sys.stderr)
+
     with open(output, "w") as handle:
         handle.write("\n".join(lines) + "\n")
     print(f"Análisis guardado en {output}")
-    return host
+    return alerts
 
 
 def parse_args():
@@ -250,7 +359,8 @@ def parse_args():
 def main():
     args = parse_args()
     output = args.output or os.path.join("resultados", f"analisis_{host_from_paths(args.csv)}.md")
-    analyze(args.csv, output)
+    alerts = analyze(args.csv, output)
+    sys.exit(1 if alerts else 0)
 
 
 if __name__ == "__main__":
