@@ -5,8 +5,10 @@
 # -np 2, 3 y 4 (el 3 prueba el residuo del reparto), compara llave_hallada con
 # llave_real en la línea CSV. Con -b 20 todo es rápido; ciclico y
 # maestro_trabajador usan -c 8 para ejercitar el reparto con muchos chunks.
-# Además revisa que -h salga con 0 y que maestro_trabajador con -np 1 dé error
-# sin colgarse. Imprime OK o FALLA por caso y sale con código != 0 si algo falla.
+# hibrido se prueba con 1 y 2 hilos por proceso (OMP_NUM_THREADS) y sin atar
+# los procesos a un núcleo. Además revisa que -h salga con 0 y que
+# maestro_trabajador con -np 1 dé error sin colgarse. Imprime OK o FALLA por
+# caso y sale con código != 0 si algo falla.
 #
 # Uso: [BITS=20] [MPIRUN=mpirun] [LIMIT=60] scripts/verificar.sh
 set -uo pipefail
@@ -17,10 +19,9 @@ MPIRUN=${MPIRUN:-mpirun}
 LIMIT=${LIMIT:-60}
 KEYS=(a b c facil media dificil)
 NPS=(2 3 4)
+HYBRID_THREADS=(1 2)
 
-# Programas MPI y sus opciones extra; hibrido entra solo cuando ya existe.
 MPI_PROGRAMS=("naive" "intercalado" "ciclico -c 8" "maestro_trabajador -c 8")
-[[ -x bin/hibrido ]] && MPI_PROGRAMS+=("hibrido")
 
 # Límite por caso para detectar cuelgues (macOS no trae timeout: se usa gtimeout si está).
 if command -v timeout > /dev/null; then
@@ -88,6 +89,20 @@ for entry in "${MPI_PROGRAMS[@]}"; do
     done
     check_exit "$program -h" 0 "$MPIRUN" -np 2 "./bin/$program" -h
 done
+
+# Open MPI ata cada proceso a un núcleo: sin --bind-to none los hilos se lo disputan.
+if [[ -x bin/hibrido ]]; then
+    for threads in "${HYBRID_THREADS[@]}"; do
+        for np in "${NPS[@]}"; do
+            for key in "${KEYS[@]}"; do
+                OMP_NUM_THREADS=$threads check_key "hibrido T=$threads -np $np -k $key" \
+                    "$MPIRUN" --bind-to none -x OMP_NUM_THREADS -np "$np" ./bin/hibrido \
+                    -f data/texto.txt -k "$key" -b "$BITS"
+            done
+        done
+    done
+    check_exit "hibrido -h" 0 "$MPIRUN" -np 2 ./bin/hibrido -h
+fi
 
 check_exit "maestro_trabajador -np 1 da error" error \
     "$MPIRUN" -np 1 ./bin/maestro_trabajador -f data/texto.txt -k a -b "$BITS"
