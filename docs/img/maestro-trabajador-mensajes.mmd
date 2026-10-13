@@ -17,12 +17,13 @@ sequenceDiagram
     M->>T2: MPI_Send(TAG_WORK, chunk 3)
     Note over T1: prueba el chunk 0 y luego MPI_Wait por el 1
     Note over T2: prueba el chunk 2: try_key(llave) = 1
-    T2->>M: MPI_Send(TAG_REQUEST, {halló, llave, iteraciones})
-    Note over M: T_p = MPI_Wtime() - start
-    T2->>T2: MPI_Wait (respuesta del pedido adelantado: chunk 3)
-    M->>T2: MPI_Send(TAG_STOP)
+    T2->>M: MPI_Send(TAG_REQUEST, {halló, llave, iteraciones}) (mensaje final)
+    Note over M: T_p = MPI_Wtime() - start, y desde aquí responde STOP
+    T2->>T2: MPI_Wait (respuesta del pedido adelantado: chunk 3, se descarta)
     Note over T1: termina el chunk 0, MPI_Wait entrega el chunk 1
     T1->>M: MPI_Send(TAG_REQUEST, {pide}) + MPI_Irecv (adelantado)
     M->>T1: MPI_Send(TAG_STOP)
-    Note over T1: prueba el chunk 1 y su MPI_Wait recibe STOP: termina
+    Note over T1: prueba el chunk 1 y su MPI_Wait recibe STOP
+    T1->>M: MPI_Send(TAG_REQUEST, {terminé}) (mensaje final)
+    Note over M: sale cuando recibió el mensaje final de todos
     Note over M,T2: MPI_Reduce(llaves probadas) y el maestro imprime el reporte
