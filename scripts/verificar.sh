@@ -105,6 +105,15 @@ if [[ -x bin/hibrido ]]; then
     check_exit "hibrido -h" 0 "$MPIRUN" -np 2 ./bin/hibrido -h
 fi
 
+# Con el chunk por defecto (2^16) y -b 18 solo hay 4 chunks: se acaban antes de
+# hallar la llave y el protocolo cierra con STOP adelantados.
+for np in 4 8; do
+    for key in facil media dificil; do
+        check_key "maestro_trabajador pocos chunks -np $np -k $key" \
+            "$MPIRUN" -np "$np" ./bin/maestro_trabajador -f data/texto.txt -k "$key" -b 18
+    done
+done
+
 check_exit "maestro_trabajador -np 1 da error" error \
     "$MPIRUN" -np 1 ./bin/maestro_trabajador -f data/texto.txt -k a -b "$BITS"
 

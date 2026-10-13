@@ -4,10 +4,12 @@
  *          bajo demanda y los procesos 1..p-1 los prueban.
  *
  * El maestro no busca: atiende pedidos. Cada trabajador pide un chunk, lo
- * prueba y pide otro; si halla la llave, la manda en su siguiente pedido.
- * Desde ese momento (o al vencer el límite, o al acabarse los chunks) el
- * maestro responde STOP a cada pedido. Invariante del protocolo: cada pedido
- * recibe exactamente una respuesta, así que nadie se cuelga en MPI_Finalize.
+ * prueba y pide otro. Desde que alguien halla la llave (o al vencer el límite,
+ * o al acabarse los chunks) el maestro responde STOP a cada pedido.
+ * Invariantes del protocolo: cada pedido (ASK) recibe exactamente una
+ * respuesta, y cada trabajador termina con un único mensaje final sin
+ * respuesta (FOUND con la llave, o DONE). El maestro sale cuando recibió el
+ * mensaje final de todos, así que nadie se cuelga en MPI_Finalize.
  *
  * Con W = p - 1 trabajadores el speedup ronda p - 1, pero el reparto se
  * balancea solo: un núcleo más lento simplemente pide menos chunks.
@@ -31,14 +33,14 @@ enum { TAG_REQUEST = 10, TAG_WORK = 11, TAG_STOP = 12 };
 /** Pedido de un trabajador: {estado, llave hallada, sus iteraciones}. */
 enum { REQ_STATE, REQ_KEY, REQ_ITERATIONS, REQ_COUNT };
 
-/** Estado del pedido: solo pide trabajo, o además avisa que halló la llave. */
-enum { STATE_ASK = 0, STATE_FOUND = 1 };
+/** Estado del pedido: pide trabajo, o mensaje final (halló la llave o terminó sin hallarla). */
+enum { STATE_ASK = 0, STATE_FOUND = 1, STATE_DONE = 2 };
 
 /** Respuesta del maestro: {primera llave, una más allá de la última}. */
 enum { WORK_FIRST, WORK_END, WORK_COUNT };
 
 /**
- * @brief  (Proceso 0) Atiende pedidos hasta que todos los trabajadores reciben STOP.
+ * @brief  (Proceso 0) Atiende pedidos hasta recibir el mensaje final de cada trabajador.
  *
  * T_p se toma en el instante en que llega el aviso de la llave, no al final:
  * lo que tarden los demás en terminar su chunk ya no es parte de la búsqueda.
@@ -69,13 +71,17 @@ static void run_master(const mpi_search_t *search, search_result_t *result)
         MPI_Recv(request, REQ_COUNT, MPI_UINT64_T, MPI_ANY_SOURCE, TAG_REQUEST, MPI_COMM_WORLD,
                  &status);
 
-        if (request[REQ_STATE] == STATE_FOUND && !result->found) {
-            result->found       = 1;
-            result->found_key   = request[REQ_KEY];
-            result->finder_rank = status.MPI_SOURCE;
-            result->iterations  = request[REQ_ITERATIONS];
-            result->elapsed_s   = MPI_Wtime() - start;
-            stopping = 1;
+        if (request[REQ_STATE] != STATE_ASK) {
+            if (request[REQ_STATE] == STATE_FOUND && !result->found) {
+                result->found       = 1;
+                result->found_key   = request[REQ_KEY];
+                result->finder_rank = status.MPI_SOURCE;
+                result->iterations  = request[REQ_ITERATIONS];
+                result->elapsed_s   = MPI_Wtime() - start;
+                stopping = 1;
+            }
+            --active;
+            continue;
         }
         if (!stopping && deadline > 0.0 && MPI_Wtime() >= deadline) {
             stopping = 1;
@@ -84,7 +90,6 @@ static void run_master(const mpi_search_t *search, search_result_t *result)
         if (stopping || next_chunk >= chunk_count) {
             const uint64_t none[WORK_COUNT] = {0, 0};
             MPI_Send(none, WORK_COUNT, MPI_UINT64_T, status.MPI_SOURCE, TAG_STOP, MPI_COMM_WORLD);
-            --active;
         } else {
             const uint64_t work[WORK_COUNT] = {next_chunk * chunk_size, (next_chunk + 1) * chunk_size};
             MPI_Send(work, WORK_COUNT, MPI_UINT64_T, status.MPI_SOURCE, TAG_WORK, MPI_COMM_WORLD);
@@ -120,12 +125,12 @@ static int search_chunk(const mpi_search_t *search, const uint64_t work[WORK_COU
 }
 
 /**
- * @brief  (Procesos 1..p-1) Pide chunks y los prueba hasta recibir STOP.
+ * @brief  (Procesos 1..p-1) Pide chunks y los prueba hasta recibir STOP o hallar la llave.
  *
  * Doble buffer: apenas recibe el chunk i pide el i + 1 (MPI_Send + MPI_Irecv),
  * prueba el i y luego espera el i + 1 con MPI_Wait, así la ida y vuelta con el
- * maestro se solapa con el cálculo. Cada pedido enviado tiene su recepción en
- * el código: nunca hay más de dos respuestas pendientes y todas se reciben.
+ * maestro se solapa con el cálculo. Nunca hay más de una respuesta pendiente,
+ * se recibe siempre, y al final sale un solo mensaje final (FOUND o DONE).
  *
  * @param  search  Búsqueda.
  * @return Llaves que probó este trabajador.
@@ -151,21 +156,22 @@ static uint64_t run_worker(const mpi_search_t *search)
         uint64_t found_key;
         if (search_chunk(search, work, &iterations, &found_key)) {
             /*
-             * El aviso sale de una vez para no retrasar T_p. Quedan dos respuestas
-             * pendientes; como MPI no adelanta mensajes del mismo origen, la del
-             * pedido adelantado llega al MPI_Irecv y la del aviso (STOP) al MPI_Recv.
+             * El aviso sale de una vez para no retrasar T_p. Como MPI no adelanta
+             * mensajes del mismo origen, el maestro ya atendió el pedido adelantado
+             * cuando lee el aviso; su respuesta (WORK o STOP) se recibe y se descarta.
              */
             const uint64_t report[REQ_COUNT] = {STATE_FOUND, found_key, iterations};
             MPI_Send(report, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
             MPI_Wait(&next_request, MPI_STATUS_IGNORE);
-            MPI_Recv(work, WORK_COUNT, MPI_UINT64_T, MASTER, TAG_STOP, MPI_COMM_WORLD,
-                     MPI_STATUS_IGNORE);
-            break;
+            return iterations;
         }
 
         MPI_Wait(&next_request, &status);
         memcpy(work, next_work, sizeof(work));
     }
+
+    const uint64_t done[REQ_COUNT] = {STATE_DONE, 0, iterations};
+    MPI_Send(done, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
     return iterations;
 }
 
