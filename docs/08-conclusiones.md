@@ -3,9 +3,9 @@
 ## Conclusiones
 
 1. **El reparto decide el speedup, no el número de procesos.** Con el mismo código de búsqueda y
-   los mismos 4 procesos, el naive va de S ≈ 1 (llaves a, b y difícil) a S aparentes de 10^7
-   (llaves c y fácil con 28 bits; ≈ 10^16 con 56), mientras que el intercalado y el bloque-cíclico
-   dan S ≈ p con **cualquier** llave. El tiempo del naive depende de dónde cae la llave dentro del
+   los mismos 4 procesos, el naive va de S = 0.79 (llave difícil) a S = 11 000 aparente (llave
+   fácil con 28 bits; ≈ 10^16 con 56), mientras que el intercalado y el bloque-cíclico dan
+   S = 3.19–3.28 con **cualquier** llave. El tiempo del naive depende de dónde cae la llave dentro del
    bloque del proceso que la tiene; el de los repartos alternativos, solo de k/p.
 2. **El proyecto no es superlineal.** Los S > p del naive son un **efecto de búsqueda**: el
    proceso que tiene la llave empieza cerca de ella, pero no prueba llaves más rápido. El speedup
@@ -13,8 +13,8 @@
    todas las llaves el speedup esperado del naive es p, igual que el del intercalado. El análisis
    automático lo comprueba en cada campaña: ningún enfoque alternativo da S > w.
 3. **Lo que gana un enfoque alternativo es consistencia.** El intercalado y el bloque-cíclico
-   sostienen una eficiencia alta y estable en las tres llaves; el maestro-trabajador queda cerca
-   de p − 1 porque el maestro no busca, a cambio de balancear solo la carga cuando los núcleos son
+   sostienen E ≈ 0.80–0.82 en las tres llaves; el maestro-trabajador queda en S ≈ 2.3 con 4
+   procesos (0.77 de su techo de p − 1 = 3) porque el maestro no busca, a cambio de balancear solo la carga cuando los núcleos son
    desiguales.
 4. **La «parte secuencial» de Amdahl no es código secuencial.** Leer y cifrar el texto tarda
    milisegundos; la f_s que se despeja del speedup medido es pérdida efectiva: el turbo que baja
@@ -23,10 +23,12 @@
    demás.
 5. **La fuerza bruta escala al estilo de Gustafson.** El trabajo crece solo (cada bit duplica el
    espacio), y con w trabajadores en el mismo tiempo se cubren log2(w) bits más. Recorrer las
-   2^56 llaves en un día exigiría unos 270 000 núcleos al ritmo medido de un solo núcleo.
+   2^56 llaves en un día exigiría unos 281 000 núcleos al ritmo medido de un solo núcleo
+   (2.97·10^6 llaves/s); en uno solo serían unos 770 años.
 6. **El híbrido MPI + OpenMP da un speedup consistente con la versión sin OpenMP.** Con un hilo
-   es el intercalado; con más hilos el tiempo baja de forma pareja en las tres llaves y queda
-   cerca del intercalado puro con los mismos trabajadores, siempre que los procesos no queden
+   es el intercalado (0.96–0.98 de su tiempo); con 2 y 4 hilos el speedup sube a ≈ 5.8 y ≈ 10 de
+   forma pareja en las tres llaves, y con 8 trabajadores queda incluso algo mejor que el
+   intercalado puro, siempre que los procesos no queden
    atados a un núcleo.
 
 ## Retos y cómo se resolvieron con Open MPI
