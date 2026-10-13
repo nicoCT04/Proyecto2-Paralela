@@ -1,6 +1,6 @@
 # Enfoques de paralelización
 
-Los cinco programas MPI resuelven el mismo problema con el mismo arranque, el mismo aviso de
+Los cinco programas MPI (y el híbrido, que añade OpenMP) resuelven el mismo problema con el mismo arranque, el mismo aviso de
 llave y el mismo reporte (módulo `search_mpi`). Lo único que cambia entre ellos es **qué llaves
 prueba cada proceso y en qué orden**. Este capítulo describe cada reparto, predice con una
 fórmula quién halla la llave y en cuántas iteraciones, y discute qué gana y qué pierde cada uno.
@@ -144,6 +144,60 @@ casi en round-robin entre ellos, así que se comporta como el bloque-cíclico co
 - **Fuga que domina:** **parte secuencial η_f** estructural (el maestro, que solo reparte) y
   **comunicación η_c** (un pedido y una respuesta por chunk, ocultos en parte por el pedido
   adelantado). Con más procesos, (p − 1)/p → 1.
+
+## 5. Híbrido MPI + OpenMP (extra)
+
+**Idea.** Es el intercalado con dos niveles: p procesos MPI y T hilos de OpenMP por proceso
+(`OMP_NUM_THREADS`). El hilo t del proceso r es el trabajador global g = r·T + t y prueba
+g, g + pT, g + 2pT, …: el mismo intercalado, ahora con w = p·T trabajadores.
+
+![Qué llaves prueba cada hilo del híbrido (16 llaves, p = 2, T = 2)](img/hibrido-reparto.png)
+
+```text
+MPI_Init_thread(MPI_THREAD_FUNNELED)             # solo el hilo principal llama a MPI
+mpi_search_setup; T = omp_get_max_threads() del proceso 0, MPI_Bcast(T)
+antena: MPI_Irecv; MPI_Barrier; inicio = MPI_Wtime()
+#pragma omp parallel num_threads(T) reduction(+: llaves)
+    g = r·T + t;  workspace propio
+    para k = g, g + pT, g + 2pT, ... < N:
+        cada 4096 llaves:
+            si t == 0 y MPI_Test(antena): stop = 1     # aviso de otro proceso
+            si stop: salir
+        si try_key(k): critical { guardar k, iteraciones }; stop = 1; salir
+si un hilo la halló: MPI_Send(aviso) a todos        # fuera de la región paralela
+MPI_Wait(antena); MPI_Reduce(llaves); reporte con hilos = T
+```
+
+**Decisiones.** `try_key` es reentrante (la agenda de subllaves de DES es local), así que basta
+un `workspace` por hilo. La bandera de parada es un `atomic_int` de C11; los hilos la leen cada
+4096 llaves, igual que el sondeo MPI. Con `MPI_THREAD_FUNNELED` solo el hilo 0 (el principal)
+llama a `MPI_Test`, y el aviso sale después de la región paralela: no hace falta que el MPI
+instalado soporte llamadas desde varios hilos. T lo decide el proceso 0 y lo difunde, para que
+todos usen el mismo paso p·T.
+
+**Ojo al medir.** Open MPI 5 ata cada proceso a **un** núcleo por defecto: los T hilos de un
+proceso se pelean ese núcleo y el híbrido no escala (en el i9, con 4 procesos, 1, 2 y 4 hilos
+tardaban casi lo mismo). Por eso el híbrido se lanza con `mpirun --bind-to none`, y así lo hacen
+`verificar.sh` y `campana.sh`. En macOS Open MPI no ata procesos, así que allá no cambia nada.
+
+**Quién la halla.** El hilo g = k mod pT, tras ⌊k/(pT)⌋ + 1 iteraciones:
+
+> S_iter = (k + 1) / (⌊k/(pT)⌋ + 1) ≈ p·T, y nunca mayor que p·T.
+
+Con T = 1 es exactamente el intercalado. Para E, C y F se usa w = p·T.
+
+- **Ventajas:** usa todos los núcleos con pocos procesos MPI (menos mensajes y menos memoria que
+  `intercalado -np p·T`); el speedup sigue siendo consistente para cualquier llave.
+- **Desventajas:** un nivel más de sincronización; depende de cómo el lanzador ata los procesos;
+  con más trabajadores que núcleos de rendimiento, los hilos que caen en núcleos de eficiencia
+  frenan al resto, porque el reparto es estático.
+- **Fuga que domina:** la del **hardware** (turbo y núcleos P/E) al crecer w, más la
+  **comunicación η_c** del sondeo, que ahora solo hace un hilo por proceso.
+
+**Demostración de consistencia.** Sale de tres comparaciones de la campaña (capítulo de
+análisis): (1) con T = 1, el híbrido tarda lo mismo que el intercalado; (2) con T = 2 y 4, el
+tiempo baja de forma pareja en las tres llaves; (3) frente a `intercalado -np p·T`, con los
+mismos trabajadores pero todos MPI, el tiempo es parecido.
 
 ## Tabla teórica (56 bits, `-np 4`, C = 2^16)
 

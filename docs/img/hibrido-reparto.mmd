@@ -1,0 +1,14 @@
+%% Qué llaves prueba cada hilo del híbrido con 16 llaves, p = 2 procesos y T = 2 hilos (trabajador g = r·T + t, paso p·T = 4).
+%% Generar el PNG:  npx -y @mermaid-js/mermaid-cli -i docs/img/hibrido-reparto.mmd -o docs/img/hibrido-reparto.png -s 2 -b white
+flowchart LR
+    subgraph P0["Proceso 0: hilo 0 sondea MPI_Test"]
+        direction TB
+        H00["hilo 0 (g = 0): 0, 4, 8, 12"]
+        H01["hilo 1 (g = 1): 1, 5, 9, 13"]
+    end
+    subgraph P1["Proceso 1: hilo 0 sondea MPI_Test"]
+        direction TB
+        H10["hilo 0 (g = 2): 2, 6, 10, 14"]
+        H11["hilo 1 (g = 3): 3, 7, 11, 15"]
+    end
+    P0 ~~~ P1

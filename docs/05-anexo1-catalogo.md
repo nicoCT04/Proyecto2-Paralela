@@ -2,7 +2,7 @@
 
 Todas las funciones del proyecto, incluidas las `static`, agrupadas por archivo. Cada una lleva
 sus entradas y salidas (nombre, tipo y uso) y una descripción. Al final están las funciones de
-librería que usamos: OpenSSL, Open MPI y la libc.
+librería que usamos: OpenSSL, Open MPI, la libc, OpenMP y los módulos de Python del análisis.
 
 ## `des_utils.c` · DES sobre OpenSSL
 
@@ -340,7 +340,8 @@ salen sin quedar esperando.
 | retorno | `int` | `SEARCH_READY`, `SEARCH_HELP` o `SEARCH_ERROR` |
 | `*search` | `mpi_search_t` | Rango, procesos, parámetros, problema y `workspace` |
 
-**Descripción.** Inicia MPI. El proceso 0 lee los parámetros y el archivo y valida el número de
+**Descripción.** Inicia MPI con `MPI_Init`, salvo que ya esté iniciado (`MPI_Initialized`; el
+híbrido lo inicia antes con `MPI_Init_thread`). El proceso 0 lee los parámetros y el archivo y valida el número de
 procesos; luego se reparte el problema, el proceso 0 imprime el encabezado y cada proceso
 reserva su `workspace`. Si no hay que buscar, cierra MPI antes de volver.
 
@@ -516,10 +517,11 @@ Luego todos cierran la antena con `MPI_Wait`, toman el tiempo y arman el resulta
 |---|---|---|
 | `*result` | `search_result_t` | Hallazgo, proceso, iteraciones y T_p |
 
-**Descripción.** Atiende pedidos con `MPI_Recv(ANY_SOURCE)` y responde a cada uno con
-exactamente un mensaje: un chunk (`TAG_WORK`) o `TAG_STOP`. Responde STOP en cuanto llega el
-hallazgo (y ahí toma T_p), cuando vence el plazo o cuando se acaban los chunks. Termina cuando
-todos los trabajadores recibieron su STOP.
+**Descripción.** Atiende pedidos con `MPI_Recv(ANY_SOURCE)`. A cada pedido (ASK) responde
+exactamente un mensaje: un chunk (`TAG_WORK`) o `TAG_STOP`. Responde STOP desde que llega el
+hallazgo (y ahí toma T_p), cuando vence el plazo o cuando se acaban los chunks. Los mensajes
+finales (FOUND o DONE) no llevan respuesta y descuentan un trabajador activo; termina cuando
+recibió el mensaje final de todos.
 
 ### `search_chunk` (`static`, maestro_trabajador)
 
@@ -548,7 +550,8 @@ todos los trabajadores recibieron su STOP.
 
 **Descripción.** Pide un chunk y, apenas lo recibe, pide el siguiente por adelantado
 (`MPI_Send` + `MPI_Irecv`). Prueba el actual y espera el próximo con `MPI_Wait`. Si halla la
-llave, avisa de inmediato y recibe las dos respuestas pendientes; termina al recibir STOP.
+llave, envía de inmediato el mensaje final FOUND y recibe (y descarta) la respuesta pendiente;
+si recibe STOP sin hallarla, envía el mensaje final DONE.
 
 ### `main` (maestro_trabajador)
 
@@ -563,6 +566,102 @@ llave, avisa de inmediato y recibe las dos respuestas pendientes; termina al rec
 
 **Descripción.** Prepara la búsqueda con mínimo 2 procesos. El proceso 0 corre `run_master` y
 los demás `run_worker`; al final, `mpi_search_report` con 0 llaves aportadas por el maestro.
+
+## `hibrido.c` · MPI + OpenMP
+
+### `init_threaded_mpi` (`static`)
+
+| Entradas | Tipo | Uso |
+|---|---|---|
+| `argc`, `argv` | `int *`, `char ***` | Argumentos (se pasan a `MPI_Init_thread`) |
+
+| Salidas | Tipo | Uso |
+|---|---|---|
+| retorno | `int` | 0 si MPI da al menos `MPI_THREAD_FUNNELED`, −1 si no (ya avisó y cerró MPI) |
+
+**Descripción.** Inicia MPI con `MPI_Init_thread` pidiendo `MPI_THREAD_FUNNELED` (solo el hilo
+principal llama a MPI) y valida el nivel que el MPI instalado concede en `provided`.
+
+### `share_threads` (`static`)
+
+| Entradas | Tipo | Uso |
+|---|---|---|
+| `search` | `const mpi_search_t *` | Rango, procesos y espacio de llaves |
+
+| Salidas | Tipo | Uso |
+|---|---|---|
+| retorno | `int` | Hilos por proceso T, o −1 si no sirven |
+
+**Descripción.** El proceso 0 lee T con `omp_get_max_threads` (es decir, de `OMP_NUM_THREADS`),
+valida 1 ≤ T ≤ 256 y que p·T no supere las llaves del espacio, y lo difunde con `MPI_Bcast` para
+que todos usen el mismo T aunque el entorno de algún proceso difiera.
+
+### `search_thread` (`static`)
+
+| Entradas | Tipo | Uso |
+|---|---|---|
+| `listener` | `found_listener_t *` | Antena del proceso; solo la toca el hilo 0 |
+| `search` | `const mpi_search_t *` | Problema, rango y procesos |
+| `threads` | `int` | Hilos por proceso T |
+| `shared` | `thread_shared_t *` | Bandera de parada y hallazgo del proceso |
+
+| Salidas | Tipo | Uso |
+|---|---|---|
+| retorno | `uint64_t` | Llaves que probó este hilo |
+| `*shared` | `thread_shared_t` | Llave e iteraciones si este hilo la halló; `stop` levantada |
+
+**Descripción.** Cuerpo de la región paralela. El hilo t del proceso r es el trabajador global
+g = r·T + t y prueba g, g + pT, g + 2pT, … con su propio `workspace`. Cada `POLL_INTERVAL` llaves
+revisa la bandera atómica `stop`; el hilo 0 además llama a `found_listener_poll` (`MPI_Test`) y
+levanta la bandera si llegó un aviso de otro proceso. El hilo que halla la llave la guarda en una
+sección `critical` y levanta la bandera.
+
+### `main` (hibrido)
+
+| Entradas | Tipo | Uso |
+|---|---|---|
+| `argc`, `argv` | `int`, `char **` | `-f`, `-k`, `-p`, `-b`, `-t` |
+| `OMP_NUM_THREADS` | variable de entorno | Hilos por proceso (la lee el proceso 0) |
+
+| Salidas | Tipo | Uso |
+|---|---|---|
+| retorno | `int` | `EXIT_SUCCESS`, o `EXIT_FAILURE` con parámetros o hilos inválidos |
+| (stdout) | texto | Reporte y CSV del proceso 0, con `hilos = T` |
+
+**Descripción.** Inicia MPI con hilos, prepara la búsqueda con `mpi_search_setup`, acuerda T y
+pone la antena. Abre la región paralela (`#pragma omp parallel` con `reduction(+)` de las llaves
+probadas) y, ya fuera de ella, el hilo principal hace el `found_listener_announce` si un hilo
+halló la llave (FUNNELED). Cierra con `found_listener_finish` y `mpi_search_report`.
+
+## `scripts/analizar.py` · Análisis de la campaña
+
+Funciones de Python que convierten `resultados/campana_<host>_*.csv` en
+`resultados/analisis_<host>.md` y las gráficas de `docs/img/`.
+
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `Group` (clase) | caso, programa, procesos, hilos, bits, llave real | objeto con listas de tiempos, iteraciones y llaves probadas | Repeticiones de un mismo caso; `time`, `finder_iterations` y `keys_tried` dan la **mediana** y `workers` = p·h |
+| `case_rank`, `program_rank` | `str` caso o programa | `int` | Orden fijo de llaves y programas en tablas y gráficas |
+| `host_from_paths` | `list[str]` rutas | `str` host | Saca el host del nombre `campana_<host>_<fecha>.csv` |
+| `load_groups` | `list[str]` rutas | grupos válidos, todos los grupos, `int` filas | Lee los CSV, agrupa y aparta las corridas con `llave_hallada != llave_real` |
+| `sequential_times` | grupos | `dict` (caso, bits) → T_s | Mediana del `secuencial` por llave y bits |
+| `metrics` | `Group`, `float` T_s | `dict` S, E, C, F, S_iter, S_rend | Las fórmulas de clase con w = p·h |
+| `amdahl_fp` | `float` S, `int` p | `float` f_p | f_p = (1 − 1/S)/(1 − 1/p) |
+| `amdahl_speedup` | `float` f_p, `float` p | `float` S | 1/(f_s + f_p/p) |
+| `gustafson_speedup` | `float` f_s, `int` p | `float` S | p − f_s(p − 1) |
+| `ideal_speedup` | `Group` | `int` | p·h, o p − 1 en el maestro-trabajador |
+| `note` | `Group`, métricas, lista de alertas | `str` nota | Regla del superlineal: «aparente (búsqueda)» en el naive; `REVISAR` si otro programa da S > w o cualquiera da S_rend > w (tolerancia 2 %) |
+| `fmt` | `float`, dígitos | `str` | Número legible, en notación científica si es enorme o diminuto |
+| `time_cell`, `label` | `Group` | `str` | Celda «mediana (mín–máx)» y nombre del programa con sus hilos |
+| `main_table` | líneas, grupos, T_s, alertas | líneas de Markdown | Tabla de T_p, S, E, C, F, S_iter, S_rend y nota |
+| `amdahl_section` | líneas, grupos, T_s, p principal, llave del barrido | `dict` programa → f_p | f_p, f_s, techo, Gustafson y bits extra; predicción de Amdahl frente al barrido |
+| `style_axes` | eje de matplotlib | — | Rejilla y ejes discretos |
+| `plot_speedup_by_key` | matplotlib, grupos, T_s, p, ruta | PNG | Barras de S por programa y llave con la línea S = p; el naive aparente se recorta y se rotula |
+| `plot_sweep` | matplotlib, grupos, T_s, f_p, llave, ruta | PNG | S contra p con la ideal y la curva de Amdahl |
+| `plot_hybrid` | matplotlib, grupos, T_s, ruta | PNG | Tiempo y speedup del híbrido contra los hilos |
+| `plot_all` | grupos, T_s, f_p, p, llave, host, carpeta | `list[str]` rutas | Genera las gráficas si hay matplotlib; si no, avisa y sigue |
+| `analyze` | rutas, salida, carpeta de imágenes | `list[str]` alertas | Arma el `.md` completo e imprime las alertas |
+| `parse_args`, `main` | línea de comandos | código de salida | 1 si hubo alguna alerta `REVISAR` |
 
 ## Librerías
 
@@ -581,6 +680,8 @@ los demás `run_worker`; al final, `mpi_search_report` con 0 llaves aportadas po
 | Primitiva | Uso en el proyecto |
 |---|---|
 | `MPI_Init`, `MPI_Finalize` | Abren y cierran MPI (`mpi_search_setup` y `mpi_search_release`) |
+| `MPI_Init_thread` | El híbrido inicia MPI pidiendo `MPI_THREAD_FUNNELED` |
+| `MPI_Initialized` | `mpi_search_setup` no vuelve a iniciar MPI si el híbrido ya lo hizo |
 | `MPI_Comm_rank`, `MPI_Comm_size` | Rango propio y número de procesos |
 | `MPI_Bcast` | Reparte el encabezado, el cifrado y la frase desde el proceso 0 |
 | `MPI_Barrier` | Sincroniza el inicio de la búsqueda |
@@ -609,6 +710,21 @@ los demás `run_worker`; al final, `mpi_search_report` con 0 llaves aportadas po
 | `clock_gettime` | Reloj monotónico del secuencial |
 | `nanosleep` | Pausa de 1 ms del proceso 0 mientras vigila el límite |
 
-## Híbrido (Esteban)
+### OpenMP y C11 (híbrido)
 
-_Pendiente: funciones de `hibrido.c` y primitivas de OpenMP._
+| Primitiva | Uso en el proyecto |
+|---|---|
+| `#pragma omp parallel num_threads(T) reduction(+ : iterations)` | Región paralela con T hilos; suma las llaves probadas de todos los hilos |
+| `#pragma omp critical(found_key)` | Guarda llave e iteraciones del primer hilo que la halla |
+| `omp_get_max_threads` | El proceso 0 lee T de `OMP_NUM_THREADS` |
+| `omp_get_thread_num` | Número de hilo t, para el trabajador global g = r·T + t |
+| `atomic_int`, `atomic_init`, `atomic_store`, `atomic_load_explicit` (`<stdatomic.h>`) | Bandera de parada compartida entre los hilos de un proceso |
+
+### Python (análisis)
+
+| Módulo | Uso |
+|---|---|
+| `csv`, `statistics.median` | Leer la campaña y tomar la mediana de las repeticiones |
+| `math.log2` | Bits extra según Gustafson |
+| `argparse`, `os`, `re`, `sys` | Línea de comandos, rutas y alertas |
+| `matplotlib` (opcional) | Gráficas en `docs/img/` |
