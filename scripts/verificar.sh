@@ -24,10 +24,11 @@ HYBRID_THREADS=(1 2)
 MPI_PROGRAMS=("naive" "intercalado" "ciclico -c 8" "maestro_trabajador -c 8")
 
 # Límite por caso para detectar cuelgues (macOS no trae timeout: se usa gtimeout si está).
+# -k: prterun puede ignorar el SIGTERM si se traba al cerrar; 5 s después va SIGKILL.
 if command -v timeout > /dev/null; then
-    GUARD=(timeout "$LIMIT")
+    GUARD=(timeout -k 5 "$LIMIT")
 elif command -v gtimeout > /dev/null; then
-    GUARD=(gtimeout "$LIMIT")
+    GUARD=(gtimeout -k 5 "$LIMIT")
 else
     GUARD=()
     echo "Aviso: sin timeout ni gtimeout; un cuelgue detendría el script." >&2
@@ -66,8 +67,8 @@ check_exit() {
     if [[ $expected == 0 ]]; then
         [[ $code -eq 0 ]]
     else
-        # 124 es el código de timeout: un cuelgue no cuenta como error limpio.
-        [[ $code -ne 0 && $code -ne 124 ]]
+        # 124 (timeout) y 137 (SIGKILL de -k): un cuelgue no cuenta como error limpio.
+        [[ $code -ne 0 && $code -ne 124 && $code -ne 137 ]]
     fi
     report $? "$label (salida $code)"
 }
