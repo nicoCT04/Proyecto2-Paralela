@@ -1,21 +1,24 @@
-# Anexo 2 · Bitácora de pruebas y speedups
+# Anexo 2: Bitácora de pruebas y speedups
 
 ## Máquina y software
 
-Mediciones **preliminares** en la laptop de Esteban (la campaña final se repite en la MacBook Pro
-de Nico con el mismo procedimiento):
+Estas mediciones son preliminares y se tomaron en la laptop de Esteban. La campaña final se
+repite en la MacBook Pro de Nico con el mismo procedimiento. La tabla describe la máquina.
 
-| | |
+| Componente | Detalle |
 |---|---|
-| CPU | Intel Core i9-13980HX: 24 núcleos (8 de rendimiento con *hyperthreading* + 16 de eficiencia), 32 hilos |
+| CPU | Intel Core i9-13980HX: 24 núcleos (8 de rendimiento con *hyperthreading* y 16 de eficiencia), 32 hilos |
 | Memoria | 16 GB |
 | Sistema | CachyOS (Linux 7.2.9) |
-| Compilador | GCC 16.2.1 con `-O2 -march=native -std=c11` (los mismos en todos los programas) |
-| MPI y librerías | Open MPI 5.0.11 · OpenSSL 3.6.5 · OpenMP de GCC |
+| Compilador | GCC 16.2.1 con `-O2 -march=native -std=c11`, las mismas banderas en todos los programas |
+| MPI y librerías | Open MPI 5.0.11, OpenSSL 3.6.5 y el OpenMP de GCC |
 
-La ficha completa (`lscpu` y versión de `mpirun`) queda en `resultados/maquina_escu.txt`.
+La ficha completa, con la salida de `lscpu` y la versión de `mpirun`, queda en
+`resultados/maquina_escu.txt`.
 
 ## Procedimiento
+
+La campaña se corrió con los comandos siguientes, en este orden.
 
 ```bash
 make clean && make
@@ -25,39 +28,41 @@ python3 scripts/analizar.py resultados/campana_escu_<fecha>.csv
 python3 scripts/capturas.py                           # capturas de este anexo
 ```
 
-- **Bits:** 28 (N = 2^28 = 268 435 456). Los presets escalan con N, así que cada llave conserva
-  la posición relativa que tiene con 56 bits.
-- **Llaves:** fácil (N/2 + 1 = 134 217 729), media (N/2 + N/8 = 167 772 160) y difícil
-  (⌈N/7 + N/13⌉ = 58 996 804).
-- **Repeticiones:** 5 por caso; se reporta la **mediana** (y el mínimo y el máximo).
-- **Tiempo:** de pared. En los programas MPI, `MPI_Wtime` desde la barrera hasta que llega el
-  aviso; en el secuencial, `clock_gettime(CLOCK_MONOTONIC)` alrededor de la búsqueda.
-- **T_s:** la mediana del programa `secuencial` con la misma llave y los mismos bits, no el
-  paralelo con un proceso.
-- **Híbrido:** `mpirun --bind-to none -x OMP_NUM_THREADS -np 4` con 1, 2 y 4 hilos.
+Se usaron 28 bits, es decir, N = 2^28 = 268 435 456 llaves. Los presets escalan con N, así que
+cada llave conserva la posición relativa que tiene con 56 bits. La llave fácil vale
+N/2 + 1 = 134 217 729, la media N/2 + N/8 = 167 772 160 y la difícil ⌈N/7 + N/13⌉ = 58 996 804.
+
+Cada caso se repitió 5 veces y se reporta la mediana, junto con el mínimo y el máximo. El tiempo
+es de pared. En los programas MPI se mide con `MPI_Wtime` desde la barrera hasta que llega el
+aviso, y en el secuencial con `clock_gettime(CLOCK_MONOTONIC)` alrededor de la búsqueda. T_s es la
+mediana del programa `secuencial` con la misma llave y los mismos bits, no el paralelo con un
+proceso. El híbrido se lanzó con `mpirun --bind-to none -x OMP_NUM_THREADS -np 4` y 1, 2 y 4
+hilos.
 
 ## Verificación
 
-`scripts/verificar.sh` con `-b 20` corre cada programa con las 6 llaves (a, b, c, fácil, media y
-difícil) y `-np` 2, 3 y 4; el híbrido además con 1 y 2 hilos, y el maestro-trabajador con pocos
-chunks (`-b 18`, que agota los chunks antes de hallar la llave) y con `-np 1` (debe dar error
-sin colgarse). Resultado: **126 casos, 0 fallas**.
+El script `scripts/verificar.sh` usa `-b 20` y corre cada programa con las 6 llaves (a, b, c,
+fácil, media y difícil) y con 2, 3 y 4 procesos. El híbrido se prueba además con 1 y 2 hilos. El
+maestro-trabajador se prueba con pocos chunks (`-b 18`), que se agotan antes de hallar la llave,
+y con un solo proceso, donde debe dar error sin colgarse. El resultado fue de 126 casos y 0
+fallas, como muestra la figura 14.
 
 ![Verificación](capturas/anexo2-verificar.png)
 
-*Final de `scripts/verificar.sh`: los últimos casos y el resumen.*
+Figura 14. Final de la salida de `scripts/verificar.sh`, con los últimos casos y el resumen.
 
-## Pruebas B.1 y B.2 (Nico)
+## Pruebas B.1 y B.2
 
-Las corridas del cifrado (llave 42) y de las pruebas a, b y c del naive con `-np 4` están en el
-capítulo de pruebas B, con sus capturas y `resultados/pruebas_b2.csv`. En resumen: a da S ≈ 0.9
-(mediana de 5), b no termina con 56 bits (≈ 149 años en secuencial; con 28 bits, S = 0.96) y c la
-halla el proceso 1 al primer intento (S aparente ≈ 3.9·10^12 con 56 bits).
+Las corridas del cifrado con la llave 42 y las pruebas a, b y c del naive con `-np 4` están en el
+capítulo de pruebas B, con sus capturas y el archivo `resultados/pruebas_b2.csv`. La prueba a da
+S ≈ 0.9 como mediana de 5 corridas. La b no termina con 56 bits, pues tomaría unos 149 años en
+secuencial, y con 28 bits da S = 0.96. La c la halla el proceso 1 al primer intento, con un S
+aparente de unos 3.9·10^12 con 56 bits.
 
 ## Campaña preliminar: tiempos (mediana de 5, en segundos)
 
-140 corridas; las 140 hallaron la llave real. Mínimo y máximo de cada caso en
-`resultados/analisis_escu.md`.
+La campaña tuvo 140 corridas y las 140 hallaron la llave real. El mínimo y el máximo de cada caso
+están en `resultados/analisis_escu.md`.
 
 | Programa | p | h | fácil | media | difícil |
 |---|---|---|---|---|---|
@@ -82,7 +87,7 @@ halla el proceso 1 al primer intento (S aparente ≈ 3.9·10^12 con 56 bits).
 | hibrido, 2 hilos | 8 | 5.69 | 5.75 | 5.91 | 0.72 |
 | hibrido, 4 hilos | 16 | 11.08 | 9.75 | 9.92 | 0.61 |
 
-**Alertas del análisis: ninguna.** Ningún enfoque alternativo da S > w y ningún programa da
+El análisis no levantó ninguna alerta. Ningún enfoque alternativo da S > w y ningún programa da
 S_rend > w.
 
 ## Barrido de procesos (llave media)
@@ -94,40 +99,37 @@ S_rend > w.
 
 ## Capturas
 
-Cada captura es la salida real de los comandos, tal como la imprimen los programas, tomada con
-`scripts/capturas.py` en la misma máquina después de la campaña (los tiempos de una corrida
-suelta varían unas décimas respecto a la mediana).
-
-**Secuencial (T_s)**
+Cada captura muestra la salida real de los comandos, tal como la imprimen los programas. Se
+tomaron con `scripts/capturas.py` en la misma máquina, después de la campaña. Los tiempos de una
+corrida suelta varían unas décimas respecto a la mediana.
 
 ![Secuencial](capturas/anexo2-secuencial.png)
 
-**Naive**
+Figura 15. Secuencial con las llaves fácil, media y difícil; estas corridas dan el T_s.
 
 ![Naive](capturas/anexo2-naive.png)
 
-*Fácil: el proceso 2 la halla al segundo intento. Media: el proceso 2 a la mitad de su bloque.
-Difícil: el proceso 0, con las mismas iteraciones que el secuencial.*
-
-**Intercalado**
+Figura 16. Naive con 4 procesos. Con la llave fácil, el proceso 2 la halla al segundo intento;
+con la media, a la mitad de su bloque; con la difícil, el proceso 0 la halla con las mismas
+iteraciones que el secuencial.
 
 ![Intercalado](capturas/anexo2-intercalado.png)
 
-**Bloque-cíclico**
+Figura 17. Intercalado con 4 procesos y las tres llaves.
 
 ![Bloque-cíclico](capturas/anexo2-ciclico.png)
 
-**Maestro-trabajador**
+Figura 18. Bloque-cíclico con 4 procesos y chunks de 2^16 llaves.
 
 ![Maestro-trabajador](capturas/anexo2-maestro_trabajador.png)
 
-**Híbrido (4 procesos × 4 hilos)**
+Figura 19. Maestro-trabajador con 4 procesos, es decir, un maestro y tres trabajadores.
 
 ![Híbrido](capturas/anexo2-hibrido.png)
 
-**Barrido de procesos**
+Figura 20. Híbrido con 4 procesos y 4 hilos por proceso.
 
 ![Barrido](capturas/anexo2-barrido.png)
 
-*Intercalado y maestro-trabajador con 2 y 8 procesos (se muestran solo las líneas clave de cada
-reporte).*
+Figura 21. Barrido de procesos: intercalado y maestro-trabajador con 2 y 8 procesos. Solo se
+muestran las líneas clave de cada reporte.
