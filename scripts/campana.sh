@@ -4,7 +4,8 @@
 #   1. Comparación principal: secuencial, naive, intercalado, ciclico y
 #      maestro_trabajador con -np $NP, para cada llave de $KEYS y cada
 #      repetición. Si existe bin/hibrido, también con -np $NP y cada número de
-#      hilos de $HYBRID_THREADS (por OMP_NUM_THREADS).
+#      hilos de $HYBRID_THREADS (por OMP_NUM_THREADS), sin atar los procesos a
+#      un núcleo (--bind-to none) para que sus hilos se repartan.
 #   2. Barrido de procesos: intercalado y maestro_trabajador con la llave media
 #      y cada -np de $NP_LIST, salvo $NP, que ya está en la comparación principal.
 #
@@ -110,8 +111,8 @@ for key in $KEYS; do
         if [[ $HAS_HYBRID -eq 1 ]]; then
             for threads in $HYBRID_THREADS; do
                 export OMP_NUM_THREADS=$threads
-                run "$key" "$rep" \
-                    $MPIRUN -x OMP_NUM_THREADS -np "$NP" ./bin/hibrido -f "$TEXT" -k "$key" -b "$BITS"
+                run "$key" "$rep" $MPIRUN --bind-to none -x OMP_NUM_THREADS -np "$NP" \
+                    ./bin/hibrido -f "$TEXT" -k "$key" -b "$BITS"
             done
             unset OMP_NUM_THREADS
         fi
