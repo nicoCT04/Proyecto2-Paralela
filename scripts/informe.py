@@ -46,77 +46,87 @@ CHAPTERS = [
 
 COVER = """
 <section class="cover">
-  <p class="org">Universidad del Valle de Guatemala<br>Facultad de Ingeniería<br>
-  Departamento de Ciencias de la Computación</p>
-  <p class="course">CC3069 · Computación Paralela y Distribuida<br>Ing. Juan Luis García</p>
-  <h1 class="title">Proyecto 2<br><span>Fuerza bruta sobre DES con Open MPI</span></h1>
-  <p class="subtitle">Informe</p>
+  <p>Universidad del Valle de Guatemala<br>Facultad de Ingeniería<br>
+  Departamento de Ciencias de la Computación<br>CC3069 Computación Paralela y Distribuida<br>
+  Ing. Juan Luis García</p>
+  <p class="title">Proyecto 2<br>Fuerza bruta sobre DES con Open MPI</p>
   <table class="team">
     <tr><td>Esteban Cárcamo</td><td>23016</td></tr>
     <tr><td>Nicolás Concuá</td><td>23197</td></tr>
     <tr><td>Diego López</td><td>23747</td></tr>
   </table>
-  <p class="date">Guatemala, 14 de octubre de 2026</p>
+  <p>Guatemala, 14 de octubre de 2026</p>
 </section>
 """
 
 CSS = """
-@page { size: Letter; margin: 2.5cm 2.3cm 2.6cm 2.3cm; }
-* { box-sizing: border-box; }
-body { font-family: "DejaVu Serif", "Liberation Serif", Georgia, serif; font-size: 10.5pt;
-       line-height: 1.45; color: #111; }
-h1, h2, h3, h4 { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
-                 color: #0b2a4a; break-after: avoid; }
-h1 { font-size: 19pt; margin: 0 0 14pt; padding-bottom: 6pt; border-bottom: 2px solid #0b2a4a; }
-h2 { font-size: 14pt; margin: 18pt 0 6pt; }
-h3 { font-size: 11.5pt; margin: 14pt 0 4pt; }
-h4 { font-size: 10.5pt; margin: 10pt 0 4pt; }
-p, li { text-align: justify; hyphens: auto; }
-code { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8.6pt;
-       background: #f2f2f0; padding: 0 2px; border-radius: 2px; }
-pre { background: #f6f6f4; border: 1px solid #e2e2de; border-radius: 4px; padding: 7pt 9pt;
-      font-size: 8.3pt; line-height: 1.35; white-space: pre-wrap; break-inside: avoid; }
-pre code { background: none; padding: 0; font-size: inherit; }
-table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 8.6pt;
-        font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; }
-th, td { border: 1px solid #c9c9c4; padding: 3pt 5pt; vertical-align: top; text-align: left; }
-th { background: #e9eef4; }
+@page { size: Letter; margin: 2.5cm; }
+* { box-sizing: border-box; color: #000; }
+body { font-family: Arial, "Liberation Sans", Helvetica, sans-serif; font-size: 11pt;
+       line-height: 1.5; font-weight: normal; }
+h1, h2, h3 { font-weight: bold; break-after: avoid; }
+h1 { font-size: 16pt; text-align: center; margin: 0 0 18pt; }
+h2 { font-size: 14pt; text-align: left; margin: 18pt 0 8pt; }
+h3 { font-size: 12pt; text-align: left; margin: 14pt 0 6pt; }
+p { text-align: justify; margin: 0 0 10pt; }
+strong, b { font-weight: normal; }
+code { font-family: "Courier New", "Liberation Mono", monospace; font-size: 10pt; }
+pre { border: 0.5pt solid #000; padding: 6pt 8pt; margin: 0 0 10pt; font-size: 9pt;
+      line-height: 1.3; white-space: pre-wrap; break-inside: avoid; }
+pre code { font-size: inherit; }
+table { border-collapse: collapse; width: 100%; margin: 4pt 0 12pt; font-size: 10pt;
+        line-height: 1.3; }
+th, td { border: 0.5pt solid #000; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+th { font-weight: normal; }
 tr { break-inside: avoid; }
-blockquote { margin: 6pt 0 8pt; padding: 4pt 10pt; border-left: 3px solid #0b2a4a;
-             background: #f4f7fa; }
-img { max-width: 100%; max-height: 19cm; display: block; margin: 6pt auto; }
-p:has(> img) { text-align: center; break-inside: avoid; }
-em { color: #333; }
+img { max-width: 100%; max-height: 18cm; display: block; margin: 6pt auto 4pt; }
+p:has(> img) { break-after: avoid; margin: 0; }
+p.caption { text-align: center; font-size: 10pt; margin: 2pt 0 14pt; }
+sup, sub { font-size: 75%; line-height: 0; }
 section.chapter { break-before: page; }
-.part { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 9pt; letter-spacing: 1px;
-        text-transform: uppercase; color: #6b6b66; margin: 0 0 2pt; }
+section.refs p { text-align: left; padding-left: 1.27cm; text-indent: -1.27cm; }
 .mark { font-size: 1px; color: #fff; }
-.cover { text-align: center; height: 22cm; display: flex; flex-direction: column;
-         justify-content: space-between; font-family: "DejaVu Sans", Arial, sans-serif; }
-.cover .org { font-size: 13pt; line-height: 1.6; text-align: center; }
-.cover .course { font-size: 11pt; color: #333; text-align: center; }
-.cover .title { border: none; font-size: 26pt; line-height: 1.3; }
-.cover .title span { font-size: 17pt; font-weight: normal; }
-.cover .subtitle { font-size: 13pt; letter-spacing: 3px; text-transform: uppercase;
-                   text-align: center; }
-.cover .team { width: auto; margin: 0 auto; font-size: 11.5pt; }
-.cover .team td { border: none; padding: 2pt 14pt; }
-.cover .date { font-size: 11pt; text-align: center; }
+.cover { text-align: center; height: 22.5cm; display: flex; flex-direction: column;
+         justify-content: space-between; }
+.cover p { text-align: center; margin: 0; }
+.cover .title { font-size: 16pt; font-weight: bold; }
+.cover .team { width: auto; margin: 0 auto; font-size: 11pt; }
+.cover .team td { border: none; padding: 1pt 12pt; }
 .toc { break-before: page; }
-.toc ol { list-style: none; padding: 0; margin: 0; font-family: "DejaVu Sans", Arial, sans-serif; }
-.toc li { display: flex; text-align: left; margin: 0; }
-.toc li.l1 { font-weight: bold; margin-top: 7pt; font-size: 10.5pt; }
-.toc li.l2 { padding-left: 16pt; font-size: 9.5pt; }
-.toc li .dots { flex: 1; border-bottom: 1px dotted #999; margin: 0 4pt 4pt; }
-.toc a { color: inherit; text-decoration: none; }
+.toc ol { list-style: none; padding: 0; margin: 0; }
+.toc li { display: flex; margin: 0; line-height: 1.6; }
+.toc li.l1 { font-weight: bold; margin-top: 6pt; }
+.toc li.l2 { padding-left: 16pt; }
+.toc li .dots { flex: 1; border-bottom: 1px dotted #000; margin: 0 4pt 5pt; }
+.toc a { text-decoration: none; }
 """
 
 HEADING = re.compile(r"<h([12])>(.*?)</h\1>", re.S)
+SUPERSCRIPT = re.compile(r"\b([0-9A-Za-z.]+)\^([−-]?[0-9A-Za-z]+)")
+SUBSCRIPT = re.compile(r"(?<![0-9A-Za-z_])([A-Za-zη])_(\{[^}]+\}|[0-9A-Za-z]+)")
+CAPTION = re.compile(r"<p>(Figura \d+\..*?)</p>", re.S)
+
+
+def typeset(body):
+    """Exponentes y subíndices de verdad (2^56, T_s) fuera del código, y pies de figura."""
+    parts = re.split(r"(<[^>]+>)", body)
+    in_code = 0
+    for i, part in enumerate(parts):
+        if part.startswith("<"):
+            if re.match(r"<(code|pre)\b", part):
+                in_code += 1
+            elif re.match(r"</(code|pre)>", part):
+                in_code -= 1
+            continue
+        if in_code == 0:
+            part = SUPERSCRIPT.sub(r"\1<sup>\2</sup>", part)
+            parts[i] = SUBSCRIPT.sub(lambda m: f"{m.group(1)}<sub>{m.group(2).strip('{}')}</sub>", part)
+    return CAPTION.sub(r'<p class="caption">\1</p>', "".join(parts))
 
 
 def chapter_html(text, index):
     """Convierte un capítulo y le pone id y marca invisible a cada h1 y h2."""
-    body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists"])
+    body = typeset(markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists"]))
     headings = []
 
     def tag(match):
@@ -140,7 +150,8 @@ def build_html(pages_by_anchor):
             continue
         with open(path, encoding="utf-8") as handle:
             body, headings = chapter_html(handle.read(), index)
-        sections.append(f'<section class="chapter"><p class="part">{part}</p>{body}</section>')
+        css = "chapter refs" if name.startswith("09-") else "chapter"
+        sections.append(f'<section class="{css}">{body}</section>')
         for level, label, anchor in headings:
             page = pages_by_anchor.get(anchor, "")
             toc.append(f'<li class="l{level}"><a href="#{anchor}">{html.escape(label)}</a>'
@@ -191,8 +202,8 @@ def stamp_page_numbers(source, output):
             width, height = float(page.mediabox.width), float(page.mediabox.height)
             buffer = io.BytesIO()
             sheet = canvas.Canvas(buffer, pagesize=(width, height) if width else letter)
-            sheet.setFont("Helvetica", 9)
-            sheet.setFillGray(0.35)
+            sheet.setFont("Helvetica", 10)
+            sheet.setFillGray(0)
             sheet.drawCentredString(width / 2, 36, str(number))
             sheet.save()
             buffer.seek(0)
