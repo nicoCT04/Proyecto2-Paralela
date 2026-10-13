@@ -14,6 +14,9 @@ porque el texto descifrado contiene una frase clave conocida de antemano.
 | Compilador C, make | `sudo pacman -S base-devel` | `sudo apt install build-essential` | `xcode-select --install` |
 | OpenSSL (DES) | `sudo pacman -S openssl` | `sudo apt install libssl-dev` | `brew install openssl@3` |
 | Open MPI | `sudo pacman -S openmpi` | `sudo apt install openmpi-bin libopenmpi-dev` | `brew install open-mpi` |
+| OpenMP (híbrido) | viene con gcc | viene con gcc | `brew install libomp` |
+| Análisis (opcional) | `python3` + `matplotlib` | `python3` + `python3-matplotlib` | `python3` + `pip3 install matplotlib` |
+| Informe PDF (opcional) | `chromium`, `python-markdown`, `python-pypdf`, `python-reportlab` | `chromium` + `pip3 install markdown pypdf reportlab` | Google Chrome + `pip3 install markdown pypdf reportlab` |
 
 `rpc/des_crypt.h`, que usa el `bruteforce.c` del curso, ya no existe en Linux
 moderno; se reemplazó por la API DES de OpenSSL (`<openssl/des.h>`, `-lcrypto`).
@@ -22,7 +25,7 @@ En macOS el `Makefile` toma OpenSSL de Homebrew (`brew --prefix openssl@3`).
 ## Compilar
 
 ```bash
-make          # compila cifrar y secuencial (gcc) y los programas MPI (mpicc)
+make          # compila cifrar y secuencial (gcc), los programas MPI (mpicc) y el híbrido (mpicc + OpenMP)
 make clean    # borra lo compilado
 ```
 
@@ -105,7 +108,25 @@ que el naive (módulo `search_mpi`); solo cambia qué llaves prueba cada proceso
 | `maestro_trabajador` | el proceso 0 reparte chunks bajo demanda y los procesos 1..p−1 buscan (mínimo 2 procesos) | `mpirun -np 4 ./bin/maestro_trabajador -f data/texto.txt -k media -b 24 -c 16` |
 
 El maestro-trabajador pide el siguiente chunk por adelantado para ocultar la
-ida y vuelta con el maestro, y respeta `-t` con resolución de un chunk.
+ida y vuelta con el maestro, y respeta `-t` con resolución de un chunk. Cada
+trabajador cierra con un único mensaje final (halló la llave o terminó), y el
+maestro sale cuando los recibió todos.
+
+### `hibrido`: intercalado con MPI + OpenMP (extra)
+
+```bash
+OMP_NUM_THREADS=4 mpirun --bind-to none -x OMP_NUM_THREADS -np 4 \
+    ./bin/hibrido -f data/texto.txt -k media -b 24
+```
+
+El hilo t del proceso r es el trabajador g = r·T + t y prueba g, g + pT,
+g + 2pT, …: el intercalado con p·T trabajadores. Los hilos por proceso (T) salen
+de `OMP_NUM_THREADS` del proceso 0. MPI se inicia con `MPI_THREAD_FUNNELED`: solo
+el hilo 0 sondea la antena y el aviso sale fuera de la región paralela.
+
+**Importante:** Open MPI 5 ata cada proceso a un núcleo, y entonces los T hilos
+se lo disputan. Para que escale hay que lanzarlo con `--bind-to none` (en macOS
+no hace falta, pero no estorba).
 
 ## Mediciones
 
@@ -116,6 +137,8 @@ NP=4 LIMIT=120 scripts/pruebas_b2.sh  # mismas pruebas con procesos y límite ex
 scripts/verificar.sh                # todos los programas hallan la llave real (-b 20, -np 2 3 4)
 scripts/campana.sh                  # campaña completa (BITS=28, 5 repeticiones)
 BITS=24 REPS=1 scripts/campana.sh   # campaña corta para probar
+python3 scripts/analizar.py resultados/campana_<host>_<fecha>.csv   # tablas, alertas y gráficas
+python3 scripts/informe.py          # arma docs/informe.pdf desde docs/*.md
 ```
 
 Los resultados quedan en `resultados/secuencial_longitudes.csv` y
@@ -123,10 +146,35 @@ Los resultados quedan en `resultados/secuencial_longitudes.csv` y
 secuencial, así que el script usa el límite `-t` y las repite con `-b 28`.
 
 `verificar.sh` imprime `OK` o `FALLA` por caso y sale con código distinto de 0
-si algo falla. `campana.sh` se configura por variables de entorno (`BITS`,
+si algo falla. Incluye el híbrido con 1 y 2 hilos y el maestro-trabajador con
+pocos chunks. `campana.sh` se configura por variables de entorno (`BITS`,
 `REPS`, `NP`, `NP_LIST`, `KEYS`, `HYBRID_THREADS`, `MPIRUN`), imprime una
 estimación de cuánto va a tardar y deja `resultados/campana_<host>_<fecha>.csv`
 (caso, repetición y las columnas del CSV) y `resultados/maquina_<host>.txt`.
+
+`analizar.py` toma la mediana de cada caso y calcula, con T_s = mediana del
+secuencial con la misma llave y bits y w = procesos · hilos: speedup, eficiencia,
+costo, efectividad, el speedup por iteraciones y el de rendimiento (llaves/s),
+f_p por Amdahl, su techo y Gustafson. Escribe `resultados/analisis_<host>.md` y
+las gráficas en `docs/img/` (si hay matplotlib). Marca con `REVISAR` (y sale con
+código 1) cualquier S > w fuera del naive o cualquier rendimiento mayor que w: en
+este problema el speedup no debe ser superlineal, y el S > p del naive con las
+llaves c, fácil y media es aparente (efecto de búsqueda).
+
+### Reproducir la campaña y el informe
+
+```bash
+make clean && make
+scripts/verificar.sh
+./bin/secuencial -f data/texto.txt -k media -b 28   # calibrar: la campaña tarda ~40× esto
+BITS=28 REPS=5 NP=4 NP_LIST="2 4 8" HYBRID_THREADS="1 2 4" scripts/campana.sh
+python3 scripts/analizar.py resultados/campana_<host>_<fecha>.csv
+python3 scripts/informe.py
+```
+
+Para medir: cerrar lo demás, conectar el cargador y ajustar `NP_LIST` y
+`HYBRID_THREADS` a los núcleos de rendimiento (`lscpu` en Linux;
+`sysctl hw.perflevel0.physicalcpu` en macOS), sin pedir más hilos que núcleos.
 
 ## Estructura
 
@@ -136,8 +184,14 @@ include/  des_utils.h   DES con OpenSSL: encrypt_des, decrypt_des, try_key
           problem.h     carga del .txt, cifrado inicial y reporte
           search_mpi.h  arranque MPI, aviso de llave y reporte comunes
 src/      cifrar.c  secuencial.c  naive.c  intercalado.c  ciclico.c
-          maestro_trabajador.c  (+ implementación de los .h)
+          maestro_trabajador.c  hibrido.c  (+ implementación de los .h)
 scripts/  medir_longitudes.sh  pruebas_b2.sh  verificar.sh  campana.sh
+          analizar.py   tablas, alertas y gráficas de la campaña
+          informe.py    docs/*.md -> docs/informe.pdf
 data/     texto.txt     "Esta es una prueba de proyecto 2"
-resultados/             CSV de las corridas
+resultados/             CSV de las corridas, ficha de cada máquina y análisis
+docs/     00..09 *.md   capítulos del informe (05 y 06 son los anexos)
+          img/          diagramas (.mmd + .png) y gráficas
+          capturas/     capturas de las corridas
+          informe.pdf   el informe completo
 ```
