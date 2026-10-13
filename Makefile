@@ -1,7 +1,8 @@
 # Proyecto 2 · Computación Paralela y Distribuida (UVG)
 #
 #   make         compila todos los programas: cifrar y secuencial con $(CC);
-#                naive, intercalado, ciclico y maestro_trabajador con mpicc
+#                naive, intercalado, ciclico y maestro_trabajador con mpicc;
+#                hibrido con mpicc y OpenMP
 #   make demo    Parte B.1: cifra y descifra data/texto.txt con la llave 42
 #   make clean   borra bin/ y obj/
 
@@ -22,8 +23,14 @@ OPENSSL_PREFIX ?= $(shell brew --prefix openssl@3 2>/dev/null)
 CPPFLAGS += -D_DARWIN_C_SOURCE -I$(OPENSSL_PREFIX)/include
 LDFLAGS  += -L$(OPENSSL_PREFIX)/lib
 CFLAGS   ?= -O2
+# Apple clang no trae OpenMP: se usa libomp de Homebrew a través del preprocesador.
+LIBOMP_PREFIX ?= $(shell brew --prefix libomp 2>/dev/null)
+OMP_CFLAGS := -Xpreprocessor -fopenmp -I$(LIBOMP_PREFIX)/include
+OMP_LIBS   := -L$(LIBOMP_PREFIX)/lib -lomp
 else
 CFLAGS   ?= -O2 -march=native
+OMP_CFLAGS := -fopenmp
+OMP_LIBS   := -fopenmp
 endif
 CFLAGS   += -std=c11 -Wall -Wextra -Wpedantic
 
@@ -32,6 +39,7 @@ COMMON_OBJ := $(COMMON_SRC:src/%.c=obj/%.o)
 SEQ_BIN    := bin/cifrar bin/secuencial
 MPI_OBJ    := obj/search_mpi.o
 MPI_BIN    := bin/naive bin/intercalado bin/ciclico bin/maestro_trabajador
+HYBRID_BIN := bin/hibrido
 
 .PHONY: all demo clean
 .SECONDARY:
@@ -43,6 +51,10 @@ $(SEQ_BIN): bin/%: obj/%.o $(COMMON_OBJ) | bin
 
 $(MPI_BIN): bin/%: src/%.c $(COMMON_OBJ) $(MPI_OBJ) $(wildcard include/*.h) | bin
 	$(MPICC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(filter %.c %.o,$^) $(LDLIBS)
+
+# El híbrido es un programa MPI más, compilado y enlazado con OpenMP.
+$(HYBRID_BIN): bin/%: src/%.c $(COMMON_OBJ) $(MPI_OBJ) $(wildcard include/*.h) | bin
+	$(MPICC) $(CPPFLAGS) $(OMP_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(filter %.c %.o,$^) $(LDLIBS) $(OMP_LIBS)
 
 # El módulo común de MPI incluye mpi.h: se compila con mpicc y solo se
 # enlaza en los programas MPI.
