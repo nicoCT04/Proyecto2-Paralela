@@ -52,8 +52,9 @@ typedef struct {
 /**
  * @brief  Inicia MPI, reparte el problema y deja todo listo para buscar.
  *
- * El proceso 0 lee parámetros y archivo y valida el número de procesos; el
- * resto recibe el problema por MPI_Bcast. Los errores salen una sola vez
+ * Llama a MPI_Init si MPI no se inició antes (el híbrido lo inicia con
+ * MPI_Init_thread). El proceso 0 lee parámetros y archivo y valida el número
+ * de procesos; el resto recibe el problema por MPI_Bcast. Los errores salen una sola vez
  * (proceso 0) y, si no hay que buscar, todos cierran MPI sin quedar esperando.
  *
  * @param  argc, argv     Argumentos del programa (se pasan a MPI_Init).

@@ -44,7 +44,7 @@ HYBRID_BIN := bin/hibrido
 .PHONY: all demo clean
 .SECONDARY:
 
-all: $(SEQ_BIN) $(MPI_BIN)
+all: $(SEQ_BIN) $(MPI_BIN) $(HYBRID_BIN)
 
 $(SEQ_BIN): bin/%: obj/%.o $(COMMON_OBJ) | bin
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)

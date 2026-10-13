@@ -99,7 +99,12 @@ int mpi_search_setup(int *argc, char ***argv, const char *program, int option_fl
                      int min_processes, mpi_search_t *search)
 {
     memset(search, 0, sizeof(*search));
-    MPI_Init(argc, argv);
+    /* El híbrido ya inició MPI con soporte de hilos (MPI_Init_thread). */
+    int initialized = 0;
+    MPI_Initialized(&initialized);
+    if (!initialized) {
+        MPI_Init(argc, argv);
+    }
     MPI_Comm_rank(MPI_COMM_WORLD, &search->rank);
     MPI_Comm_size(MPI_COMM_WORLD, &search->size);
 
