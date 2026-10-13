@@ -12,7 +12,7 @@ Las 140 corridas hallaron la llave real (`llave_hallada == llave_real`).
 
 ## Comparación principal (-np 4)
 
-### Llave facil · k = 134217729 · 28 bits · T_s = 44.792 s
+### Llave fácil · k = 134217729 · 28 bits · T_s = 44.792 s
 
 | Programa | p | h | w | T_p mediana (mín–máx) s | S | E | C (s) | F | S_iter | S_rend | Nota |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -38,7 +38,7 @@ Las 140 corridas hallaron la llave real (`llave_hallada == llave_real`).
 | hibrido (2 hilos) | 4 | 2 | 8 | 9.842 (9.679–9.957) | 5.75 | 0.72 | 78.74 | 0.073 | 8.00 | 5.73 |  |
 | hibrido (4 hilos) | 4 | 4 | 16 | 5.801 (5.346–6.557) | 9.75 | 0.61 | 92.82 | 0.105 | 16.00 | 9.72 |  |
 
-### Llave dificil · k = 58996804 · 28 bits · T_s = 20.127 s
+### Llave difícil · k = 58996804 · 28 bits · T_s = 20.127 s
 
 | Programa | p | h | w | T_p mediana (mín–máx) s | S | E | C (s) | F | S_iter | S_rend | Nota |
 |---|---|---|---|---|---|---|---|---|---|---|---|

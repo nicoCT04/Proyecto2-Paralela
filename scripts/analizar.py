@@ -33,14 +33,15 @@ import sys
 from collections import defaultdict
 
 CASE_ORDER = ["a", "b", "c", "facil", "media", "dificil"]
+CASE_NAMES = {"facil": "fácil", "dificil": "difícil"}
 PROGRAM_ORDER = ["secuencial", "naive", "intercalado", "ciclico", "maestro_trabajador", "hibrido"]
 
 # Paleta categórica en orden fijo (un color por programa, nunca reciclado).
 COLORS = {"naive": "#2a78d6", "intercalado": "#eb6834", "ciclico": "#1baf7a",
           "maestro_trabajador": "#eda100", "hibrido": "#e87ba4"}
 CASE_COLORS = {"facil": "#2a78d6", "media": "#eb6834", "dificil": "#1baf7a"}
-INK = "#0b0b0b"
-INK_MUTED = "#52514e"
+INK = "#000000"
+INK_MUTED = "#000000"
 GRID = "#e4e3df"
 
 # Margen sobre w antes de alertar: el ruido de medición puede pasar p por poco.
@@ -77,6 +78,11 @@ class Group:
     @property
     def finder_iterations(self):
         return statistics.median(self.iterations)
+
+
+def case_name(case):
+    """Nombre de la llave con tildes para tablas y gráficas."""
+    return CASE_NAMES.get(case, case)
 
 
 def case_rank(case):
@@ -302,7 +308,7 @@ def analyze(paths, output, img_dir):
         case_groups.sort(key=lambda g: (program_rank(g.program), g.threads))
         real_key = case_groups[0].real_key
         lines.append("")
-        lines.append(f"### Llave {case} · k = {real_key} · {case_bits} bits · T_s = {t_s:.3f} s")
+        lines.append(f"### Llave {case_name(case)} · k = {real_key} · {case_bits} bits · T_s = {t_s:.3f} s")
         lines.append("")
         main_table(lines, case_groups, t_s, alerts)
 
@@ -398,10 +404,9 @@ def plot_speedup_by_key(plt, groups, seq, main_np, path):
     ax.axhline(main_np, color=INK_MUTED, linestyle="--", linewidth=1)
     ax.text(len(cases) - 0.5, main_np, f" S = p = {main_np}", va="bottom", ha="right",
             fontsize=8, color=INK_MUTED)
-    ax.set_xticks(range(len(cases)), [f"llave {c}" for c in cases])
+    ax.set_xticks(range(len(cases)), [f"llave {case_name(c)}" for c in cases])
     ax.set_ylim(0, top * 1.15)
     ax.set_ylabel("Speedup S = T_s / T_p", color=INK)
-    ax.set_title(f"Speedup por llave con -np {main_np}", color=INK, fontsize=11, loc="left")
     style_axes(ax)
     ax.legend(frameon=False, fontsize=8, ncol=len(programs), loc="upper center",
               bbox_to_anchor=(0.5, -0.1))
@@ -433,7 +438,6 @@ def plot_sweep(plt, groups, seq, fractions, sweep_case, path):
     ax.plot([1, max_p], [1, max_p], linestyle="--", linewidth=1, color=INK_MUTED, label="ideal S = p")
     ax.set_xlabel("Procesos p", color=INK)
     ax.set_ylabel("Speedup S", color=INK)
-    ax.set_title(f"Barrido de procesos (llave {sweep_case})", color=INK, fontsize=11, loc="left")
     style_axes(ax)
     ax.legend(frameon=False, fontsize=8)
     fig.tight_layout()
@@ -452,16 +456,14 @@ def plot_hybrid(plt, groups, seq, path):
         max_t = max(max_t, threads[-1])
         color = CASE_COLORS.get(case, INK_MUTED)
         left.plot(threads, [g.time for g in series], marker="o", markersize=6, linewidth=2,
-                  color=color, label=f"llave {case}")
+                  color=color, label=f"llave {case_name(case)}")
         right.plot(threads, [seq[(g.case, g.bits)] / g.time for g in series], marker="o",
-                   markersize=6, linewidth=2, color=color, label=f"llave {case}")
+                   markersize=6, linewidth=2, color=color, label=f"llave {case_name(case)}")
     processes = hybrid[0].processes
     right.plot([1, max_t], [processes, processes * max_t], linestyle="--", linewidth=1,
                color=INK_MUTED, label=f"ideal S = {processes}·h")
     left.set_ylabel("T_p (s)", color=INK)
-    left.set_title(f"Híbrido -np {processes}: tiempo", color=INK, fontsize=11, loc="left")
     right.set_ylabel("Speedup S", color=INK)
-    right.set_title(f"Híbrido -np {processes}: speedup", color=INK, fontsize=11, loc="left")
     for ax in (left, right):
         ax.set_xlabel("Hilos por proceso h", color=INK)
         ax.set_xticks(sorted({g.threads for g in hybrid}))
@@ -478,6 +480,13 @@ def plot_all(groups, seq, fractions, main_np, sweep_case, host, img_dir):
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib import font_manager
+        installed = {font.name for font in font_manager.fontManager.ttflist}
+        # Arial, o Liberation Sans, que tiene sus mismas medidas, si Arial no está instalada.
+        for family in ("Arial", "Liberation Sans"):
+            if family in installed:
+                plt.rcParams["font.family"] = family
+                break
     except ImportError:
         print("Aviso: sin matplotlib; se omiten las gráficas.", file=sys.stderr)
         return []
