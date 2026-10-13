@@ -17,7 +17,10 @@ regla del proyecto: S > w fuera del naive (superlineal inesperado) o
 S_rend > w en cualquier programa (rendimiento imposible). El S > w del naive es
 aparente (efecto de búsqueda) y solo se etiqueta.
 
-Uso: python3 scripts/analizar.py resultados/campana_<host>_*.csv [-o salida.md]
+Con matplotlib (opcional) deja además en docs/img/ las gráficas de speedup por
+llave, del barrido de procesos (con la ideal y Amdahl) y del híbrido.
+
+Uso: python3 scripts/analizar.py resultados/campana_<host>_*.csv [-o salida.md] [--img dir]
 Sale con código 1 si hay alguna alerta REVISAR.
 """
 import argparse
@@ -31,6 +34,14 @@ from collections import defaultdict
 
 CASE_ORDER = ["a", "b", "c", "facil", "media", "dificil"]
 PROGRAM_ORDER = ["secuencial", "naive", "intercalado", "ciclico", "maestro_trabajador", "hibrido"]
+
+# Paleta categórica en orden fijo (un color por programa, nunca reciclado).
+COLORS = {"naive": "#2a78d6", "intercalado": "#eb6834", "ciclico": "#1baf7a",
+          "maestro_trabajador": "#eda100", "hibrido": "#e87ba4"}
+CASE_COLORS = {"facil": "#2a78d6", "media": "#eb6834", "dificil": "#1baf7a"}
+INK = "#0b0b0b"
+INK_MUTED = "#52514e"
+GRID = "#e4e3df"
 
 # Margen sobre w antes de alertar: el ruido de medición puede pasar p por poco.
 TOLERANCE = 1.02
@@ -245,7 +256,7 @@ def amdahl_section(lines, groups, seq, main_np, sweep_case):
     return fractions
 
 
-def analyze(paths, output):
+def analyze(paths, output, img_dir):
     groups, all_groups, rows = load_groups(paths)
     if not groups:
         sys.exit("Error: no hay corridas válidas en los archivos dados.")
@@ -310,7 +321,7 @@ def analyze(paths, output):
             lines.append("")
             main_table(lines, series, t_s, alerts)
 
-    amdahl_section(lines, groups, seq, main_np, sweep_case)
+    fractions = amdahl_section(lines, groups, seq, main_np, sweep_case)
 
     hybrid = [g for g in groups if g.program == "hibrido"]
     if hybrid:
@@ -345,7 +356,144 @@ def analyze(paths, output):
     with open(output, "w") as handle:
         handle.write("\n".join(lines) + "\n")
     print(f"Análisis guardado en {output}")
+    plot_all(groups, seq, fractions, main_np, sweep_case, host, img_dir)
     return alerts
+
+
+def style_axes(ax):
+    """Ejes discretos: rejilla horizontal tenue y texto en gris."""
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(INK_MUTED)
+    ax.tick_params(colors=INK_MUTED, labelsize=9)
+    ax.yaxis.grid(True, color=GRID, linewidth=0.8)
+    ax.set_axisbelow(True)
+
+
+def plot_speedup_by_key(plt, groups, seq, main_np, path):
+    """Barras de S por programa y llave, con la línea S = p; el naive aparente se recorta."""
+    programs = [p for p in PROGRAM_ORDER[1:5] if any(g.program == p for g in groups)]
+    cases = sorted({g.case for g in groups if g.program != "secuencial"}, key=case_rank)
+    lookup = {(g.case, g.program): g for g in groups
+              if g.processes == main_np and g.threads == 1}
+    top = main_np * 1.6
+    width = 0.8 / len(programs)
+    fig, ax = plt.subplots(figsize=(8, 4.2))
+    for i, program in enumerate(programs):
+        for j, case in enumerate(cases):
+            g = lookup.get((case, program))
+            t_s = seq.get((case, g.bits)) if g else None
+            if t_s is None:
+                continue
+            speedup = t_s / g.time
+            x = j + (i - (len(programs) - 1) / 2) * width
+            clipped = speedup > top
+            ax.bar(x, min(speedup, top), width * 0.92, color=COLORS[program],
+                   hatch="//" if clipped else None, edgecolor="white", linewidth=0.5,
+                   label=program if j == 0 else None)
+            text = f"{fmt(speedup)}\naparente" if clipped else fmt(speedup)
+            ax.text(x, min(speedup, top) + 0.05, text, ha="center", va="bottom",
+                    fontsize=7.5, color=INK)
+    ax.axhline(main_np, color=INK_MUTED, linestyle="--", linewidth=1)
+    ax.text(len(cases) - 0.5, main_np, f" S = p = {main_np}", va="bottom", ha="right",
+            fontsize=8, color=INK_MUTED)
+    ax.set_xticks(range(len(cases)), [f"llave {c}" for c in cases])
+    ax.set_ylim(0, top * 1.15)
+    ax.set_ylabel("Speedup S = T_s / T_p", color=INK)
+    ax.set_title(f"Speedup por llave con -np {main_np}", color=INK, fontsize=11, loc="left")
+    style_axes(ax)
+    ax.legend(frameon=False, fontsize=8, ncol=len(programs), loc="upper center",
+              bbox_to_anchor=(0.5, -0.1))
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
+def plot_sweep(plt, groups, seq, fractions, sweep_case, path):
+    """S contra p del barrido, con la ideal y la curva de Amdahl de cada programa."""
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    max_p = 1
+    for program, offset in (("intercalado", 7), ("maestro_trabajador", -7)):
+        series = sorted((g for g in groups if g.case == sweep_case and g.program == program),
+                        key=lambda g: g.processes)
+        if len(series) < 2:
+            continue
+        ps = [g.processes for g in series]
+        max_p = max(max_p, ps[-1])
+        speedups = [seq[(g.case, g.bits)] / g.time for g in series]
+        ax.plot(ps, speedups, marker="o", markersize=6, linewidth=2, color=COLORS[program],
+                label=f"{program} (medido)")
+        ax.annotate(fmt(speedups[-1]), (ps[-1], speedups[-1]), textcoords="offset points",
+                    xytext=(6, offset), va="center", fontsize=8, color=INK)
+        if program in fractions:
+            curve = [1 + i * (ps[-1] - 1) / 50 for i in range(51)]
+            ax.plot(curve, [amdahl_speedup(fractions[program], p) for p in curve], linestyle=":",
+                    linewidth=1.5, color=COLORS[program], label=f"{program} (Amdahl)")
+    ax.plot([1, max_p], [1, max_p], linestyle="--", linewidth=1, color=INK_MUTED, label="ideal S = p")
+    ax.set_xlabel("Procesos p", color=INK)
+    ax.set_ylabel("Speedup S", color=INK)
+    ax.set_title(f"Barrido de procesos (llave {sweep_case})", color=INK, fontsize=11, loc="left")
+    style_axes(ax)
+    ax.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
+def plot_hybrid(plt, groups, seq, path):
+    """Tiempo y speedup del híbrido contra los hilos por proceso, una línea por llave."""
+    hybrid = [g for g in groups if g.program == "hibrido"]
+    fig, (left, right) = plt.subplots(1, 2, figsize=(9, 3.8))
+    max_t = 1
+    for case in sorted({g.case for g in hybrid}, key=case_rank):
+        series = sorted((g for g in hybrid if g.case == case), key=lambda g: g.threads)
+        threads = [g.threads for g in series]
+        max_t = max(max_t, threads[-1])
+        color = CASE_COLORS.get(case, INK_MUTED)
+        left.plot(threads, [g.time for g in series], marker="o", markersize=6, linewidth=2,
+                  color=color, label=f"llave {case}")
+        right.plot(threads, [seq[(g.case, g.bits)] / g.time for g in series], marker="o",
+                   markersize=6, linewidth=2, color=color, label=f"llave {case}")
+    processes = hybrid[0].processes
+    right.plot([1, max_t], [processes, processes * max_t], linestyle="--", linewidth=1,
+               color=INK_MUTED, label=f"ideal S = {processes}·h")
+    left.set_ylabel("T_p (s)", color=INK)
+    left.set_title(f"Híbrido -np {processes}: tiempo", color=INK, fontsize=11, loc="left")
+    right.set_ylabel("Speedup S", color=INK)
+    right.set_title(f"Híbrido -np {processes}: speedup", color=INK, fontsize=11, loc="left")
+    for ax in (left, right):
+        ax.set_xlabel("Hilos por proceso h", color=INK)
+        ax.set_xticks(sorted({g.threads for g in hybrid}))
+        style_axes(ax)
+        ax.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
+def plot_all(groups, seq, fractions, main_np, sweep_case, host, img_dir):
+    """Genera las gráficas si matplotlib está instalado."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("Aviso: sin matplotlib; se omiten las gráficas.", file=sys.stderr)
+        return []
+    os.makedirs(img_dir, exist_ok=True)
+    paths = [os.path.join(img_dir, f"speedup_llaves_{host}.png")]
+    plot_speedup_by_key(plt, groups, seq, main_np, paths[-1])
+    if any(len({g.processes for g in groups if g.case == sweep_case and g.program == p}) > 1
+           for p in ("intercalado", "maestro_trabajador")):
+        paths.append(os.path.join(img_dir, f"barrido_{host}.png"))
+        plot_sweep(plt, groups, seq, fractions, sweep_case, paths[-1])
+    if any(g.program == "hibrido" for g in groups):
+        paths.append(os.path.join(img_dir, f"hibrido_{host}.png"))
+        plot_hybrid(plt, groups, seq, paths[-1])
+    for path in paths:
+        print(f"Gráfica guardada en {path}")
+    return paths
 
 
 def parse_args():
@@ -353,13 +501,15 @@ def parse_args():
     parser.add_argument("csv", nargs="+", help="resultados/campana_<host>_*.csv")
     parser.add_argument("-o", "--output", help="archivo .md de salida "
                         "(por defecto resultados/analisis_<host>.md)")
+    parser.add_argument("--img", default=os.path.join("docs", "img"),
+                        help="carpeta de las gráficas (por defecto docs/img)")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     output = args.output or os.path.join("resultados", f"analisis_{host_from_paths(args.csv)}.md")
-    alerts = analyze(args.csv, output)
+    alerts = analyze(args.csv, output, args.img)
     sys.exit(1 if alerts else 0)
 
 
