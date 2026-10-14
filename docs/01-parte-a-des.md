@@ -97,10 +97,10 @@ El programa `secuencial` prueba las llaves 0, 1, 2 y así en orden, hasta que el
 contiene la frase clave. Para medir cómo crece el tiempo con la longitud de la llave se usó el
 peor caso de cada longitud: con b bits, la llave 2^b − 1, que obliga a probar las 2^b llaves.
 
-Las corridas las hace `scripts/medir_longitudes.sh`. En la laptop de Esteban se repitió cada
-longitud 5 veces y se reporta la mediana (`resultados/secuencial_longitudes_escu.csv`). La
-columna de la Mac de Nico es una sola corrida por longitud (`resultados/secuencial_longitudes.csv`)
-y sirve como comparación.
+Las corridas las hace el script `medir_longitudes.sh`. En la laptop de Esteban cada longitud se
+repitió 5 veces y se reporta la mediana. En la Mac de Nico hubo una sola corrida por longitud, que
+sirve como comparación. Los datos crudos están en la carpeta `resultados/`, en los archivos
+`secuencial_longitudes_escu.csv` (laptop) y `secuencial_longitudes.csv` (Mac).
 
 | Bits | Llaves probadas | Laptop de Esteban (s) | Ritmo (llaves/s) | Mac de Nico (s) |
 |---|---|---|---|---|
