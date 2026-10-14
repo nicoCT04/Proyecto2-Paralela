@@ -2,8 +2,9 @@
 
 ## Máquina y software
 
-Estas mediciones son preliminares y se tomaron en la laptop de Esteban. La campaña final se
-repite en la MacBook Pro de Nico con el mismo procedimiento. La tabla describe la máquina.
+Todas las mediciones de este anexo, la Parte A.3 y el análisis de speedup se tomaron en la
+laptop de Esteban, que es la máquina oficial del informe. Las pruebas B.1 y B.2 se hicieron en la
+MacBook Pro de Nico, como se indica en su capítulo. La tabla describe la máquina oficial.
 
 | Componente | Detalle |
 |---|---|
@@ -23,6 +24,7 @@ La campaña se corrió con los comandos siguientes, en este orden.
 ```bash
 make clean && make
 scripts/verificar.sh                                  # 126 casos, 0 fallas
+OUT=resultados/secuencial_longitudes_escu.csv REPS=5 scripts/medir_longitudes.sh   # Parte A.3
 BITS=28 REPS=5 NP=4 NP_LIST="2 4 8" HYBRID_THREADS="1 2 4" scripts/campana.sh
 python3 scripts/analizar.py resultados/campana_escu_<fecha>.csv
 python3 scripts/capturas.py                           # capturas de este anexo
@@ -59,7 +61,7 @@ S ≈ 0.9 como mediana de 5 corridas. La b no termina con 56 bits, pues tomaría
 secuencial, y con 28 bits da S = 0.96. La c la halla el proceso 1 al primer intento, con un S
 aparente de unos 3.9·10^12 con 56 bits.
 
-## Campaña preliminar: tiempos (mediana de 5, en segundos)
+## Campaña: tiempos (mediana de 5, en segundos)
 
 La campaña tuvo 140 corridas y las 140 hallaron la llave real. El mínimo y el máximo de cada caso
 están en `resultados/analisis_escu.md`.

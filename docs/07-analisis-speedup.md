@@ -1,8 +1,8 @@
 # Análisis de speedup y del comportamiento según la llave
 
-Los números de este capítulo salen de la campaña preliminar en el i9-13980HX, con 28 bits, 5
-repeticiones por caso y la mediana de cada caso. El detalle está en el Anexo 2 y en
-`resultados/analisis_escu.md`.
+Los números de este capítulo salen de la campaña en la laptop de Esteban (i9-13980HX), la
+máquina oficial del informe, con 28 bits, 5 repeticiones por caso y la mediana de cada caso. El
+detalle está en el Anexo 2 y en `resultados/analisis_escu.md`.
 
 Las fórmulas son las del curso (Barlas, 2015; Pacheco, 2011). El speedup es S = T_s / T_p, la
 eficiencia E = S / w, el costo C = w · T_p y la efectividad F = S / C, con w = p · h
