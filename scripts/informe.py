@@ -55,6 +55,7 @@ COVER = """
     <tr><td>Nicolás Concuá</td><td>23197</td></tr>
     <tr><td>Diego López</td><td>23747</td></tr>
   </table>
+  <p>Repositorio: <a href="https://github.com/nicoCT04/Proyecto2-Paralela">https://github.com/nicoCT04/Proyecto2-Paralela</a></p>
   <p>Guatemala, 14 de octubre de 2026</p>
 </section>
 """
@@ -92,6 +93,7 @@ section.refs p { text-align: left; padding-left: 1.27cm; text-indent: -1.27cm; }
 .cover .title { font-size: 16pt; font-weight: bold; }
 .cover .team { width: auto; margin: 0 auto; font-size: 11pt; }
 .cover .team td { border: none; padding: 1pt 12pt; }
+.cover a { color: #000; text-decoration: none; }
 .toc { break-before: page; }
 .toc ol { list-style: none; padding: 0; margin: 0; }
 .toc li { display: flex; margin: 0; line-height: 1.6; }
