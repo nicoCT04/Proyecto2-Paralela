@@ -57,8 +57,9 @@ mismo sistema operativo, y mezclar macOS con Linux lo volvía frágil para el ti
 ## Estructura del informe
 
 Los antecedentes corresponden a la Parte A. Allí se describe el algoritmo DES con su diagrama de
-flujo, las rutinas de la base (`encrypt_des`, `decrypt_des`, `try_key`, `memcpy` y `strstr`) y
-las primitivas MPI del aviso de llave.
+flujo, el tiempo de la búsqueda secuencial con distintas longitudes de llave, las rutinas de la
+base (`encrypt_des`, `decrypt_des`, `try_key`, `memcpy` y `strstr`) y las primitivas MPI del
+aviso de llave.
 
 El desarrollo corresponde a la Parte B. Incluye las pruebas B.1 y B.2 del naive con las llaves
 del enunciado, los enfoques alternativos con su análisis teórico y el enfoque híbrido.

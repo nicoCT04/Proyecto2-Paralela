@@ -132,6 +132,7 @@ no hace falta, pero no estorba).
 
 ```bash
 scripts/medir_longitudes.sh         # A.3: secuencial con llaves de 16..26 bits
+OUT=resultados/secuencial_longitudes_escu.csv REPS=5 scripts/medir_longitudes.sh  # A.3 con 5 repeticiones en otro archivo
 scripts/pruebas_b2.sh               # B.2: llaves a, b y c, secuencial vs naive -np 4
 NP=4 LIMIT=120 scripts/pruebas_b2.sh  # mismas pruebas con procesos y límite explícitos
 scripts/verificar.sh                # todos los programas hallan la llave real (-b 20, -np 2 3 4)
