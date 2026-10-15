@@ -1,636 +1,82 @@
 # Anexo 1: Catálogo de funciones y librerías
 
-Todas las funciones del proyecto, incluidas las `static`, agrupadas por archivo. Cada una lleva
-sus entradas y salidas (nombre, tipo y uso) y una descripción. Al final están las funciones de
-librería que usamos: OpenSSL, Open MPI, la libc, OpenMP y los módulos de Python del análisis.
+Todas las funciones del proyecto, incluidas las `static`, agrupadas por archivo, con sus entradas,
+salidas y una descripción. Al final están las funciones de librería que se usaron: OpenSSL, Open
+MPI, la libc, OpenMP y los módulos de Python.
 
 ## `des_utils.c`: DES sobre OpenSSL
 
-### `build_des_key`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `key56` | `uint64_t` | Llave numérica; solo se usan sus 56 bits bajos |
-| `out` | `unsigned char[8]` | Buffer donde se escribe la llave DES |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `out` | `unsigned char[8]` | 8 bytes con 7 bits de llave y 1 de paridad cada uno |
-
-Descripción. Reparte los 56 bits en grupos de 7, uno por byte (bits 1..7), y completa la
-paridad impar con `DES_set_odd_parity`, igual que el `decrypt()` del `bruteforce.c` original.
-
-### `run_des` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `key` | `uint64_t` | Llave de 56 bits |
-| `buffer` | `unsigned char *` | Datos que se cifran o descifran en el mismo lugar |
-| `length` | `size_t` | Bytes de `buffer`, múltiplo de 8 |
-| `direction` | `int` | `DES_ENCRYPT` o `DES_DECRYPT` |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `buffer` | `unsigned char *` | Datos ya transformados |
-
-Descripción. Arma la llave, genera el *key schedule* con `DES_set_key_unchecked` (sin
-rechazar llaves débiles) y aplica `DES_ecb_encrypt` bloque a bloque.
-
-### `encrypt_des` y `decrypt_des`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `key` | `uint64_t` | Llave de 56 bits |
-| `buffer` | `unsigned char *` | Texto plano (cifrar) o cifrado (descifrar) |
-| `length` | `size_t` | Bytes de `buffer`, múltiplo de 8 |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `buffer` | `unsigned char *` | Resultado, en el mismo buffer |
-
-Descripción. Cifran o descifran con DES en modo ECB llamando a `run_des`. Reemplazan a
-`encrypt` y `decrypt` del `bruteforce.c`.
-
-### `try_key`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `key` | `uint64_t` | Llave candidata |
-| `cipher` | `const unsigned char *` | Texto cifrado original (no se modifica) |
-| `length` | `size_t` | Bytes del cifrado |
-| `phrase` | `const char *` | Frase clave conocida |
-| `workspace` | `unsigned char *` | Buffer de `length + 1` bytes reservado una sola vez |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 1 si el descifrado contiene la frase, 0 si no |
-
-Descripción. Copia el cifrado al `workspace` con `memcpy`, lo descifra con la llave
-candidata y busca la frase con `strstr`.
-
-### `padded_length`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `length` | `size_t` | Longitud original |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `size_t` | Longitud redondeada al siguiente múltiplo de 8 |
-
-Descripción. Calcula cuántos bytes ocupa el texto con relleno de ceros hasta completar
-bloques DES.
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `build_des_key` | `uint64_t key56`; `unsigned char out[8]` | `out`: 8 bytes con 7 bits de llave y 1 de paridad | Reparte los 56 bits en grupos de 7 (bits 1 a 7 de cada byte) y completa la paridad impar con `DES_set_odd_parity`, igual que el `decrypt()` original |
+| `run_des` (`static`) | `uint64_t key`; `unsigned char *buffer`; `size_t length` (múltiplo de 8); `int direction` | `buffer` transformado en el mismo lugar | Arma la llave, genera las subllaves con `DES_set_key_unchecked` (sin rechazar llaves débiles) y aplica `DES_ecb_encrypt` bloque a bloque |
+| `encrypt_des`, `decrypt_des` | `uint64_t key`; `unsigned char *buffer`; `size_t length` | `buffer` cifrado o descifrado | Llaman a `run_des` con `DES_ENCRYPT` o `DES_DECRYPT`; reemplazan a `encrypt` y `decrypt` del `bruteforce.c` |
+| `try_key` | `uint64_t key`; `const unsigned char *cipher`; `size_t length`; `const char *phrase`; `unsigned char *workspace` (`length + 1` bytes) | `int`: 1 si el descifrado contiene la frase | Copia el cifrado al `workspace` con `memcpy`, lo descifra con la llave candidata y busca la frase con `strstr` |
+| `padded_length` | `size_t length` | `size_t` | Redondea al siguiente múltiplo de 8 (relleno de ceros hasta completar bloques DES) |
 
 ## `options.c`: Parámetros
 
-### `print_usage` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `program` | `const char *` | Nombre del programa |
-| `flags` | `int` | Opciones extra que admite (`OPT_OUTPUT`, `OPT_CHUNK`) |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| (stderr) | texto | Ayuda del programa |
-
-Descripción. Imprime la forma de uso. `-c` y `-o` solo aparecen en los programas que las
-admiten.
-
-### `parse_u64` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `text` | `const char *` | Número en decimal o en hexadecimal con `0x`; acepta una `L` final |
-| `value` | `uint64_t *` | Destino del número |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 0 si la conversión fue completa, -1 si hay basura, signo o desbordamiento |
-| `*value` | `uint64_t` | El número convertido |
-
-Descripción. Envuelve `strtoull` y rechaza todo lo que no sea un número completo.
-
-### `resolve_key`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `text` | `const char *` | Llave escrita en `-k`: número o preset |
-| `key_bits` | `int` | Bits del espacio de búsqueda |
-| `key_out` | `uint64_t *` | Destino de la llave |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 0 si es válida y cabe en 2^bits, -1 si no |
-| `*key_out` | `uint64_t` | La llave resuelta |
-
-Descripción. Traduce los presets `a`, `b`, `c`, `facil`, `media` y `dificil` (escalados con
-N = 2^bits) o convierte el número, y valida que la llave sea menor que N.
-
-### `parse_options`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int`, `char ` | Argumentos del programa |
-| `program` | `const char *` | Nombre para la ayuda |
-| `flags` | `int` | Opciones extra admitidas (`OPT_OUTPUT`, `OPT_CHUNK`) |
-| `opts` | `program_options_t *` | Destino de los parámetros |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | `OPTIONS_OK`, `OPTIONS_HELP` u `OPTIONS_ERROR` |
-| `*opts` | `program_options_t` | Archivo, llave, frase, bits, límite de tiempo, chunk y salida |
-
-Descripción. Lee las opciones con `getopt` y las valida: rangos de `-b`, `-t` y `-c`, que
-`-c` sea menor que `-b`, que la frase no esté vacía y que la llave sea válida. Los mensajes de
-error salen en español.
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `print_usage` (`static`) | `const char *program`; `int flags` | ayuda en stderr | Forma de uso; `-c`, `-o` y `-v` solo aparecen en los programas que las admiten |
+| `parse_u64` (`static`) | `const char *text`; `uint64_t *value` | `int`: 0 si la conversión fue completa; `*value` | Envuelve `strtoull`; acepta decimal, `0x` y una `L` final, y rechaza basura, signo o desbordamiento |
+| `resolve_key` | `const char *text`; `int key_bits`; `uint64_t *key_out` | `int`: 0 si es válida; `*key_out` | Traduce los presets `a`, `b`, `c`, `facil`, `media` y `dificil` (escalados con N = 2^bits) o convierte el número, y valida que sea menor que N |
+| `parse_options` | `argc`, `argv`; `const char *program`; `int flags` (`OPT_OUTPUT`, `OPT_CHUNK`, `OPT_PROGRESS`); `program_options_t *opts` | `OPTIONS_OK`, `OPTIONS_HELP` u `OPTIONS_ERROR`; `*opts` | Lee las opciones con `getopt` y valida los rangos de `-b`, `-t` y `-c`, que `-c` sea menor que `-b`, la frase y la llave; `-v` activa el reporte de avance |
 
 ## `problem.c`: Problema y reporte
 
-### `read_text_file` (`static`)
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `read_text_file` (`static`) | `const char *path`; `size_t *length_out` | texto terminado en `'\0'` o `NULL`; bytes útiles | Lee el archivo completo, hasta 64 KiB; quita saltos de línea finales y rechaza archivos vacíos, grandes o con bytes nulos |
+| `problem_prepare` | `const program_options_t *opts`; `crack_problem_t *problem` | `int`: 0 si todo salió bien; `*problem` | Carga el texto, verifica que contenga la frase clave y lo cifra con la llave privada |
+| `problem_release` | `crack_problem_t *problem` | punteros liberados y en `NULL` | Libera texto, cifrado y frase; se puede llamar más de una vez |
+| `problem_print_header` | programa, `opts`, `problem`, `int processes` | encabezado en stdout | Archivo, frase, llave y tamaño del espacio antes de buscar |
+| `problem_print_result` | programa, `opts`, `problem`, `const search_result_t *result` | reporte y línea `CSV,` de 11 columnas | Llave hallada, quién la halló y tras cuántos intentos, texto descifrado, llaves probadas, ritmo y tiempo |
+| `print_hex` | `const char *label`; bytes; `size_t length` | hexadecimal en stdout | Imprime un buffer en grupos de 8 bytes |
+| `wall_seconds` | — | `double` | Reloj de pared monotónico (`clock_gettime(CLOCK_MONOTONIC)`) |
+| `print_progress` | `int worker`; `uint64_t iterations`; `double elapsed_s` | línea `PROGRESS,` | Avance de un trabajador para el visualizador (solo con `-v`) |
+| `print_chunk` | `int worker`; `uint64_t first_key`; `double elapsed_s` | línea `CHUNK,` | Chunk que empieza un trabajador del maestro-trabajador (solo con `-v`) |
 
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `path` | `const char *` | Ruta del `.txt` |
-| `length_out` | `size_t *` | Destino de la longitud |
+## `cifrar.c` y `secuencial.c`: Partes B.1 y A.3
 
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `char *` | Texto terminado en `'\0'` (liberar con `free`), o `NULL` si falla |
-| `*length_out` | `size_t` | Bytes útiles, sin los saltos de línea finales |
-
-Descripción. Lee el archivo completo, hasta 64 KiB. Rechaza archivos vacíos, demasiado
-grandes o con bytes nulos.
-
-### `problem_prepare`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `opts` | `const program_options_t *` | Parámetros validados |
-| `problem` | `crack_problem_t *` | Destino del problema |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 0 si todo salió bien, -1 si no |
-| `*problem` | `crack_problem_t` | Texto, cifrado con relleno, frase y tamaño del espacio |
-
-Descripción. Carga el texto, verifica que contenga la frase clave y lo cifra con la llave
-privada.
-
-### `problem_release`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `problem` | `crack_problem_t *` | Problema, completo o a medio construir |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `*problem` | `crack_problem_t` | Punteros liberados y en `NULL` |
-
-Descripción. Libera el texto, el cifrado y la frase. Se puede llamar más de una vez.
-
-### `problem_print_header`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `program` | `const char *` | Nombre del programa |
-| `opts` | `const program_options_t *` | Parámetros |
-| `problem` | `const crack_problem_t *` | Problema preparado |
-| `processes` | `int` | Número de procesos |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| (stdout) | texto | Encabezado de la corrida |
-
-Descripción. Imprime el archivo, la frase, la llave y el tamaño del espacio antes de buscar.
-
-### `problem_print_result`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `program` | `const char *` | Nombre del programa |
-| `opts` | `const program_options_t *` | Llave real y límite de tiempo |
-| `problem` | `const crack_problem_t *` | Para descifrar y mostrar el texto |
-| `result` | `const search_result_t *` | Resultado de la búsqueda |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| (stdout) | texto | Reporte y línea `CSV,` de 11 columnas |
-
-Descripción. Muestra la llave hallada, quién la halló y en cuántas iteraciones, el texto
-descifrado, las llaves probadas, el ritmo y el tiempo, y deja la línea CSV para la bitácora.
-
-### `print_hex`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `label` | `const char *` | Etiqueta de la línea |
-| `bytes` | `const unsigned char *` | Datos |
-| `length` | `size_t` | Bytes a imprimir |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| (stdout) | texto | Bytes en hexadecimal, en grupos de 8 |
-
-Descripción. Imprime un buffer en hexadecimal, separado por bloques DES.
-
-### `wall_seconds`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| — | — | — |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `double` | Segundos del reloj monotónico |
-
-Descripción. Reloj de pared del secuencial (`clock_gettime(CLOCK_MONOTONIC)`).
-
-## `cifrar.c`: Parte B.1
-
-### `write_cipher_file` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `path` | `const char *` | Archivo de salida |
-| `bytes` | `const unsigned char *` | Texto cifrado |
-| `length` | `size_t` | Bytes a escribir |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 0 si se escribió completo, -1 si no |
-
-Descripción. Guarda el cifrado en binario y revisa tanto `fwrite` como `fclose`.
-
-### `main` (cifrar)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int`, `char ` | `-f`, `-k`, `-p`, `-b`, `-o` |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | `EXIT_SUCCESS` si el descifrado coincide con el original |
-| (stdout) | texto | Texto, cifrado en hexadecimal, descifrado y contraejemplo |
-
-Descripción. Cifra el `.txt` con la llave dada, lo descifra de vuelta, lo compara con el
-original y muestra qué sale con la llave vecina.
-
-## `secuencial.c`: Parte A.3
-
-### `main` (secuencial)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int`, `char ` | `-f`, `-k`, `-p`, `-b`, `-t` |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | `EXIT_SUCCESS` si la halló o si se usó `-t` |
-| (stdout) | texto | Reporte y línea CSV |
-
-Descripción. Recorre las llaves 0, 1, 2, … hasta que `try_key` acierta, o hasta que vence
-el límite de tiempo, que revisa cada 4096 llaves.
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `write_cipher_file` (`static`) | `const char *path`; bytes; `size_t length` | `int`: 0 si se escribió completo | Guarda el cifrado en binario y revisa `fwrite` y `fclose` |
+| `main` (cifrar) | `-f`, `-k`, `-p`, `-b`, `-o` | `EXIT_SUCCESS` si el descifrado coincide; texto, cifrado en hexadecimal y contraejemplo | Cifra el `.txt`, lo descifra de vuelta, lo compara con el original y muestra qué sale con la llave vecina |
+| `main` (secuencial) | `-f`, `-k`, `-p`, `-b`, `-t`, `-v` | `EXIT_SUCCESS` si la halló o si se usó `-t`; reporte y CSV | Recorre las llaves 0, 1, 2, … hasta que `try_key` acierta o vence el límite, que revisa cada 4096 llaves |
 
 ## `search_mpi.c`: Módulo común MPI
 
-### `validate_processes` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `size` | `int` | Número de procesos |
-| `min_processes` | `int` | Mínimo que necesita el programa |
-| `problem` | `const crack_problem_t *` | Para comparar con 2^bits |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 0 si el número de procesos sirve, -1 si no |
-
-Descripción. El proceso 0 rechaza menos procesos que el mínimo (el maestro-trabajador pide
-2) o más procesos que llaves.
-
-### `share_problem` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `mpi_search_t *` | Búsqueda; en el proceso 0 ya preparada |
-| `status` | `int` | Estado del proceso 0: listo, ayuda o error |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | El estado del proceso 0, igual en todos |
-| `*search` | `mpi_search_t` | En los demás procesos: cifrado, frase, bits, límite y chunk |
-
-Descripción. Difunde con `MPI_Bcast` un encabezado de 6 enteros (estado, bits, longitudes,
-límite de tiempo y chunk) y luego el cifrado y la frase. Si el estado no es «listo», todos
-salen sin quedar esperando.
-
-### `mpi_search_setup`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int *`, `char *` | Argumentos (se pasan a `MPI_Init`) |
-| `program` | `const char *` | Nombre del programa |
-| `option_flags` | `int` | 0 u `OPT_CHUNK` |
-| `min_processes` | `int` | Mínimo de procesos |
-| `search` | `mpi_search_t *` | Destino del estado |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | `SEARCH_READY`, `SEARCH_HELP` o `SEARCH_ERROR` |
-| `*search` | `mpi_search_t` | Rango, procesos, parámetros, problema y `workspace` |
-
-Descripción. Inicia MPI con `MPI_Init`, salvo que ya esté iniciado (`MPI_Initialized`; el
-híbrido lo inicia antes con `MPI_Init_thread`). El proceso 0 lee los parámetros y el archivo y valida el número de
-procesos; luego se reparte el problema, el proceso 0 imprime el encabezado y cada proceso
-reserva su `workspace`. Si no hay que buscar, cierra MPI antes de volver.
-
-### `mpi_search_release`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `mpi_search_t *` | Búsqueda |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| — | — | Memoria liberada y MPI cerrado |
-
-Descripción. Libera el `workspace` y el problema y llama a `MPI_Finalize`.
-
-### `mpi_search_begin`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| — | — | — |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `double` | `MPI_Wtime` justo después de la barrera |
-
-Descripción. Sincroniza a todos con `MPI_Barrier` y marca el inicio de la búsqueda.
-
-### `notify_all` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `message` | `const uint64_t[3]` | {llave, proceso, iteraciones} |
-| `size` | `int` | Número de procesos |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| — | — | Un `MPI_Send` a cada proceso |
-
-Descripción. Envía el aviso a todos, incluido uno mismo, para que todos los `MPI_Irecv` se
-completen.
-
-### `announce_timeout` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `listener` | `found_listener_t *` | Antena del proceso 0 |
-| `size` | `int` | Número de procesos |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `listener->timeout_sent` | `int` | Queda en 1 |
-
-Descripción. Avisa a todos con la llave centinela `UINT64_MAX` que venció el límite de
-tiempo.
-
-### `found_listener_start`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `listener` | `found_listener_t *` | Destino de la antena |
-| `search` | `const mpi_search_t *` | Para el límite de tiempo |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `*listener` | `found_listener_t` | `MPI_Irecv` puesto, reloj iniciado y plazo (solo en el proceso 0) |
-
-Descripción. Pone la antena antes de buscar, sincroniza y arranca el reloj.
-
-### `found_listener_poll`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `listener` | `found_listener_t *` | Antena |
-| `search` | `const mpi_search_t *` | Número de procesos |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 1 si ya llegó un aviso, 0 si no |
-
-Descripción. Revisa la antena con `MPI_Test`; el proceso 0 además manda el aviso de límite
-si el plazo ya venció.
-
-### `found_listener_announce`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `const mpi_search_t *` | Rango y número de procesos |
-| `key` | `uint64_t` | Llave hallada |
-| `iterations` | `uint64_t` | Llaves que probó este proceso |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| — | — | Aviso enviado a todos |
-
-Descripción. Arma {llave, rango, iteraciones} y lo envía con `notify_all`.
-
-### `found_listener_try_key`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `listener` | `found_listener_t *` | Antena |
-| `search` | `const mpi_search_t *` | Cifrado, frase y `workspace` |
-| `key` | `uint64_t` | Llave candidata |
-| `iterations` | `uint64_t *` | Contador de llaves de este proceso |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 1 si hay que parar (la halló este proceso u otro avisó) |
-| `*iterations` | `uint64_t` | Incrementado si se probó la llave |
-
-Descripción. Es un paso del bucle de los repartos estáticos: sondea cada 4096 llaves,
-prueba la llave y, si acierta, avisa a todos.
-
-### `found_listener_finish`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `listener` | `found_listener_t *` | Antena |
-| `search` | `const mpi_search_t *` | Número de procesos |
-| `result` | `search_result_t *` | Destino del resultado |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `*result` | `search_result_t` | Hallazgo, llave, proceso, iteraciones y tiempo |
-
-Descripción. El proceso 0 sigue vigilando el plazo, con pausas de 1 ms, mientras espera.
-Luego todos cierran la antena con `MPI_Wait`, toman el tiempo y arman el resultado.
-
-### `mpi_search_report`
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `const mpi_search_t *` | Búsqueda |
-| `program` | `const char *` | Nombre del programa |
-| `result` | `const search_result_t *` | Resultado (se usa en el proceso 0) |
-| `own_iterations` | `uint64_t` | Llaves que probó este proceso |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| (stdout) | texto | Reporte y CSV, impresos por el proceso 0 |
-
-Descripción. Suma las llaves de todos con `MPI_Reduce` y el proceso 0 llama a
-`problem_print_result`.
-
-## Programas MPI
-
-### `main` (naive, intercalado, ciclico)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int`, `char ` | `-f`, `-k`, `-p`, `-b`, `-t` (y `-c` en ciclico) |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | `EXIT_SUCCESS`, o `EXIT_FAILURE` si los parámetros son inválidos |
-| (stdout) | texto | Reporte y CSV del proceso 0 |
-
-Descripción. Los tres siguen el mismo esqueleto: `mpi_search_setup` →
-`found_listener_start` → bucle con `found_listener_try_key` → `found_listener_finish` →
-`mpi_search_report` → `mpi_search_release`. Solo cambia el recorrido. El naive prueba el bloque
-contiguo `[r·N/p, (r+1)·N/p)`, el intercalado prueba `r, r+p, r+2p, …` y el cíclico recorre los
-chunks `r, r+p, …` de 2^c llaves, cada uno en orden.
-
-### `run_master` (`static`, maestro_trabajador)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `const mpi_search_t *` | Espacio, chunk, límite y procesos |
-| `result` | `search_result_t *` | Destino del resultado |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| `*result` | `search_result_t` | Hallazgo, proceso, iteraciones y T_p |
-
-Descripción. Atiende pedidos con `MPI_Recv(ANY_SOURCE)`. A cada pedido (ASK) responde
-exactamente un mensaje: un chunk (`TAG_WORK`) o `TAG_STOP`. Responde STOP desde que llega el
-hallazgo (y ahí toma T_p), cuando vence el plazo o cuando se acaban los chunks. Los mensajes
-finales (FOUND o DONE) no llevan respuesta y descuentan un trabajador activo; termina cuando
-recibió el mensaje final de todos.
-
-### `search_chunk` (`static`, maestro_trabajador)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `const mpi_search_t *` | Cifrado, frase y `workspace` |
-| `work` | `const uint64_t[2]` | {primera llave, una más allá de la última} |
-| `iterations` | `uint64_t *` | Contador de llaves del trabajador |
-| `found_key` | `uint64_t *` | Destino de la llave |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 1 si la halló, 0 si no |
-
-Descripción. Prueba en orden todas las llaves de un chunk.
-
-### `run_worker` (`static`, maestro_trabajador)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `const mpi_search_t *` | Búsqueda |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `uint64_t` | Llaves que probó el trabajador |
-
-Descripción. Pide un chunk y, apenas lo recibe, pide el siguiente por adelantado
-(`MPI_Send` + `MPI_Irecv`). Prueba el actual y espera el próximo con `MPI_Wait`. Si halla la
-llave, envía de inmediato el mensaje final FOUND y recibe (y descarta) la respuesta pendiente;
-si recibe STOP sin hallarla, envía el mensaje final DONE.
-
-### `main` (maestro_trabajador)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int`, `char ` | `-f`, `-k`, `-p`, `-b`, `-t`, `-c` |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | `EXIT_SUCCESS`, o `EXIT_FAILURE` con parámetros inválidos o `-np 1` |
-| (stdout) | texto | Reporte y CSV del proceso 0 |
-
-Descripción. Prepara la búsqueda con mínimo 2 procesos. El proceso 0 corre `run_master` y
-los demás `run_worker`; al final, `mpi_search_report` con 0 llaves aportadas por el maestro.
-
-## `hibrido.c`: MPI + OpenMP
-
-### `init_threaded_mpi` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int *`, `char *` | Argumentos (se pasan a `MPI_Init_thread`) |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | 0 si MPI da al menos `MPI_THREAD_FUNNELED`, −1 si no (ya avisó y cerró MPI) |
-
-Descripción. Inicia MPI con `MPI_Init_thread` pidiendo `MPI_THREAD_FUNNELED` (solo el hilo
-principal llama a MPI) y valida el nivel que el MPI instalado concede en `provided`.
-
-### `share_threads` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `search` | `const mpi_search_t *` | Rango, procesos y espacio de llaves |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | Hilos por proceso T, o −1 si no sirven |
-
-Descripción. El proceso 0 lee T con `omp_get_max_threads` (es decir, de `OMP_NUM_THREADS`),
-valida 1 ≤ T ≤ 256 y que p·T no supere las llaves del espacio, y lo difunde con `MPI_Bcast` para
-que todos usen el mismo T aunque el entorno de algún proceso difiera.
-
-### `search_thread` (`static`)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `listener` | `found_listener_t *` | Antena del proceso; solo la toca el hilo 0 |
-| `search` | `const mpi_search_t *` | Problema, rango y procesos |
-| `threads` | `int` | Hilos por proceso T |
-| `shared` | `thread_shared_t *` | Bandera de parada y hallazgo del proceso |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `uint64_t` | Llaves que probó este hilo |
-| `*shared` | `thread_shared_t` | Llave e iteraciones si este hilo la halló; `stop` levantada |
-
-Descripción. Cuerpo de la región paralela. El hilo t del proceso r es el trabajador global
-g = r·T + t y prueba g, g + pT, g + 2pT, … con su propio `workspace`. Cada `POLL_INTERVAL` llaves
-revisa la bandera atómica `stop`; el hilo 0 además llama a `found_listener_poll` (`MPI_Test`) y
-levanta la bandera si llegó un aviso de otro proceso. El hilo que halla la llave la guarda en una
-sección `critical` y levanta la bandera.
-
-### `main` (hibrido)
-
-| Entradas | Tipo | Uso |
-|---|---|---|
-| `argc`, `argv` | `int`, `char ` | `-f`, `-k`, `-p`, `-b`, `-t` |
-| `OMP_NUM_THREADS` | variable de entorno | Hilos por proceso (la lee el proceso 0) |
-
-| Salidas | Tipo | Uso |
-|---|---|---|
-| retorno | `int` | `EXIT_SUCCESS`, o `EXIT_FAILURE` con parámetros o hilos inválidos |
-| (stdout) | texto | Reporte y CSV del proceso 0, con `hilos = T` |
-
-Descripción. Inicia MPI con hilos, prepara la búsqueda con `mpi_search_setup`, acuerda T y
-pone la antena. Abre la región paralela (`#pragma omp parallel` con `reduction(+)` de las llaves
-probadas) y, ya fuera de ella, el hilo principal hace el `found_listener_announce` si un hilo
-halló la llave (FUNNELED). Cierra con `found_listener_finish` y `mpi_search_report`.
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `validate_processes` (`static`) | `int size`; `int min_processes`; `problem` | `int`: 0 si sirve | El proceso 0 rechaza menos procesos que el mínimo (el maestro-trabajador pide 2) o más procesos que llaves |
+| `share_problem` (`static`) | `mpi_search_t *search`; `int status` | estado del proceso 0, igual en todos | Difunde con `MPI_Bcast` un encabezado de 7 enteros (estado, bits, longitudes, límite, chunk y `-v`) y luego el cifrado y la frase; si el estado no es «listo», todos salen sin quedar esperando |
+| `mpi_search_setup` | `argc`, `argv`; programa; `int option_flags`; `int min_processes`; `search` | `SEARCH_READY`, `SEARCH_HELP` o `SEARCH_ERROR`; `*search` | Inicia MPI si no lo está (`MPI_Initialized`); el proceso 0 lee parámetros y archivo y valida los procesos; se reparte el problema y cada proceso reserva su `workspace` |
+| `mpi_search_release` | `search` | memoria liberada y MPI cerrado | Libera el `workspace` y el problema y llama a `MPI_Finalize` |
+| `mpi_search_begin` | — | `double`: `MPI_Wtime` tras la barrera | Sincroniza con `MPI_Barrier` y marca el inicio de la búsqueda |
+| `notify_all` (`static`) | `const uint64_t message[3]`; `int size` | un `MPI_Send` a cada proceso | Envía el aviso a todos, incluido uno mismo, para que todos los `MPI_Irecv` se completen |
+| `announce_timeout` (`static`) | `found_listener_t *listener`; `int size` | `timeout_sent` en 1 | Avisa con la llave centinela `UINT64_MAX` que venció el límite |
+| `found_listener_start` | `listener`; `search` | antena puesta, reloj y plazo | Pone el `MPI_Irecv` antes de buscar, sincroniza y arranca el reloj; el proceso 0 fija el plazo |
+| `found_listener_poll` | `listener`; `search` | `int`: 1 si ya llegó un aviso | Revisa la antena con `MPI_Test`; el proceso 0 además avisa si venció el plazo |
+| `found_listener_announce` | `search`; `uint64_t key`; `uint64_t iterations` | aviso enviado | Arma {llave, rango, iteraciones} y lo envía con `notify_all` |
+| `found_listener_progress` | `listener`; `search`; `int worker`; `uint64_t iterations` | línea `PROGRESS,` | Reporta el avance del proceso si se pidió `-v` |
+| `found_listener_try_key` | `listener`; `search`; `uint64_t key`; `uint64_t *iterations` | `int`: 1 si hay que parar; contador incrementado | Un paso del bucle estático: sondea cada 4096 llaves (y reporta avance con `-v`), prueba la llave y, si acierta, avisa a todos |
+| `found_listener_finish` | `listener`; `search`; `search_result_t *result` | `*result`: hallazgo, llave, proceso, iteraciones y tiempo | El proceso 0 vigila el plazo con pausas de 1 ms; luego todos cierran la antena con `MPI_Wait` y toman el tiempo |
+| `mpi_search_report` | `search`; programa; `result`; `uint64_t own_iterations` | reporte y CSV del proceso 0 | Suma las llaves de todos con `MPI_Reduce` y el proceso 0 llama a `problem_print_result` |
+
+## Programas MPI e híbrido
+
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `main` (naive, intercalado, ciclico) | `-f`, `-k`, `-p`, `-b`, `-t`, `-v` (y `-c` en ciclico) | `EXIT_SUCCESS` o `EXIT_FAILURE`; reporte y CSV | `mpi_search_setup` → `found_listener_start` → bucle con `found_listener_try_key` → `found_listener_finish` → `mpi_search_report`. Solo cambia el recorrido: bloque `[r·N/p, (r+1)·N/p)`, llaves `r, r+p, …` o chunks `r, r+p, …` de 2^c llaves |
+| `run_master` (`static`) | `search`; `search_result_t *result` | `*result` con hallazgo, proceso, iteraciones y T_p | Atiende pedidos con `MPI_Recv(ANY_SOURCE)` y responde a cada uno un chunk (`TAG_WORK`) o `TAG_STOP`; responde STOP desde el hallazgo (ahí toma T_p), el plazo o el fin de los chunks, y termina al recibir el mensaje final de cada trabajador |
+| `search_chunk` (`static`) | `search`; `const uint64_t work[2]`; `double start`; `uint64_t *iterations`; `uint64_t *found_key` | `int`: 1 si la halló | Prueba en orden las llaves de un chunk; con `-v` reporta el chunk y el avance |
+| `run_worker` (`static`) | `search` | `uint64_t`: llaves probadas | Pide el chunk siguiente por adelantado (`MPI_Send` + `MPI_Irecv`), prueba el actual y espera el próximo con `MPI_Wait`; termina con FOUND o DONE |
+| `main` (maestro_trabajador) | `-f`, `-k`, `-p`, `-b`, `-t`, `-c`, `-v` | `EXIT_FAILURE` con `-np 1`; reporte y CSV | El proceso 0 corre `run_master` y los demás `run_worker`; el maestro aporta 0 llaves |
+| `init_threaded_mpi` (`static`) | `argc`, `argv` | `int`: 0 si MPI da `MPI_THREAD_FUNNELED` | Inicia MPI con `MPI_Init_thread` y valida el nivel concedido |
+| `share_threads` (`static`) | `search` | `int`: hilos por proceso T, o −1 | El proceso 0 lee T con `omp_get_max_threads`, valida 1 ≤ T ≤ 256 y p·T ≤ N, y lo difunde con `MPI_Bcast` |
+| `search_thread` (`static`) | `listener`; `search`; `int threads`; `thread_shared_t *shared` | `uint64_t`: llaves del hilo; hallazgo en `*shared` | El hilo t del proceso r prueba g, g + pT, … con g = r·T + t; cada 4096 llaves revisa la bandera atómica, el hilo 0 sondea la antena y, con `-v`, cada hilo reporta su avance |
+| `main` (hibrido) | `-f`, `-k`, `-p`, `-b`, `-t`, `-v`; `OMP_NUM_THREADS` | reporte y CSV con `hilos = T` | Abre la región paralela con `reduction(+)` de las llaves y, fuera de ella, el hilo principal envía el aviso si un hilo halló la llave |
 
 ## `scripts/analizar.py`: Análisis de la campaña
 
@@ -661,6 +107,31 @@ Funciones de Python que convierten `resultados/campana_<host>_*.csv` en
 | `plot_all` | grupos, T_s, f_p, p, llave, host, carpeta | `list[str]` rutas | Genera las gráficas si hay matplotlib; si no, avisa y sigue |
 | `analyze` | rutas, salida, carpeta de imágenes | `list[str]` alertas | Arma el `.md` completo e imprime las alertas |
 | `parse_args`, `main` | línea de comandos | código de salida | 1 si hubo alguna alerta `REVISAR` |
+
+## `scripts/key_position_plots.py`: Figuras 12 y 13
+
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `naive_tries` | `int` llave k | `int` | Intentos del proceso del naive que tiene k: k − r·(N/p) + 1 |
+| `naive_wins` | `int` llave k | `bool` | Si el naive necesita menos intentos que el intercalado (⌊k/p⌋ + 1) |
+| `key_samples`, `zones` | — | lista de llaves; tramos (inicio, fin, gana el naive) | Puntos de la curva, incluidos los saltos de bloque, y zonas de fondo de la figura 12 |
+| `style_axes` | eje de matplotlib | — | Mismo estilo que `analizar.py` |
+| `plot_tries` | ruta del PNG | `docs/img/intentos_por_llave.png` | Intentos de cada programa según la posición de la llave, con las llaves 60 000 000 y 16 000 000 marcadas |
+| `load_campaign` | — | `dict` (llave, programa) → tiempo | Lee la campaña de 16 llaves al azar (híbrido con 2 hilos) |
+| `plot_measured` | ruta del PNG | `docs/img/speedup_llaves_azar.png` | Speedup medido de cada programa según la posición de la llave |
+| `main` | — | código de salida | Genera las dos figuras |
+
+## `visualizer/`: Visualizador web
+
+| Función | Entradas | Salidas | Descripción |
+|---|---|---|---|
+| `bounded_int` | parámetros, nombre, mínimo, máximo | `int` | Valida que un parámetro sea un entero en rango; si no, lanza `BadRequest` |
+| `build_command` | `dict` con programa, llave, bits, procesos, hilos, chunk y límite | comando, entorno y texto | Arma la llamada real (`mpirun ... -v`, con `--bind-to none` y `OMP_NUM_THREADS` en el híbrido); solo admite los seis programas |
+| `parse_line` | `str` línea del programa | `dict` | Traduce las líneas `PROGRESS`, `CHUNK` y `CSV` a eventos JSON |
+| `stop_process` | proceso | — | Termina el grupo de procesos de `mpirun` |
+| `cpu_model` | — | `str` | Modelo de CPU para el encabezado de la página |
+| `Handler` (clase) | peticiones HTTP | página, `/api/info`, `/api/run`, `/api/stop` | Solo atiende a `127.0.0.1`; corre un programa a la vez y transmite su avance línea por línea |
+| `index.html` | eventos del servidor | rectángulo, lupa, carrera y tabla | Dibuja el espacio de llaves con un color por proceso, repite las corridas con el mismo reloj y compara tiempos y speedups |
 
 ## Librerías
 

@@ -1,16 +1,15 @@
 # Enfoques de paralelización
 
-Los programas MPI resuelven el mismo problema con el mismo arranque, el mismo aviso de llave y el
-mismo reporte, que comparten en el módulo `search_mpi`. Lo único que cambia entre ellos es qué
-llaves prueba cada proceso y en qué orden. Este capítulo describe cada reparto y predice con una
-fórmula quién halla la llave y en cuántas iteraciones. También discute qué gana y qué pierde
-cada uno.
+Los programas MPI comparten el arranque, el aviso de llave y el reporte en el módulo
+`search_mpi`; lo único que cambia entre ellos es qué llaves prueba cada proceso y en qué orden.
+Este capítulo describe cada reparto, predice con una fórmula quién halla la llave y en cuántas
+iteraciones, y discute qué gana y qué pierde cada uno.
 
 ## Esqueleto común
 
-Todos los repartos estáticos siguen el mismo esqueleto. Solo el proceso 0 lee y cifra el texto,
-y luego lo difunde a los demás. Cada proceso deja puesta su antena de aviso antes de buscar y
-arranca el reloj después de una barrera.
+Todos los repartos estáticos siguen el mismo esqueleto, que usa las primitivas de la sección A.6.
+Solo el proceso 0 lee y cifra el texto y lo difunde; cada proceso deja puesta su antena antes de
+buscar y arranca el reloj después de una barrera.
 
 ```text
 proceso 0: lee parámetros y archivo, cifra el texto
@@ -23,11 +22,6 @@ para cada llave k del reparto de este proceso:
 MPI_Wait(antena); T_p = MPI_Wtime() - inicio
 MPI_Reduce(llaves probadas, SUMA) y el proceso 0 reporta
 ```
-
-El sondeo cada 4096 llaves es necesario porque Open MPI no hace avanzar la recepción mientras el
-proceso calcula. Su costo es despreciable, una llamada por cada 4096 descifrados. El aviso se
-envía también a uno mismo, para que su propio `MPI_Irecv` se complete y el `MPI_Wait` final no
-quede esperando.
 
 En lo que sigue, N = 2^bits es el número de llaves, p el de procesos y k la llave buscada. Las
 iteraciones son las llaves que probó el proceso que halló la llave. El secuencial prueba k + 1
@@ -58,11 +52,9 @@ S_iter = (k + 1) / (k − r·N/p + 1). Ese valor va de 1, cuando la llave cae en
 proceso 0, a cerca de N/p, cuando la llave es la primera de un bloque que no es el primero.
 
 Su ventaja es la simpleza: recorre llaves contiguas y no necesita más comunicación que el aviso.
-Su desventaja es que el speedup depende por completo de dónde cae la llave. Con llaves pequeñas,
-que son las que más probablemente elige una persona, no gana nada.
-
-La fuga de eficiencia que domina es el desbalance respecto a la llave. Los p − 1 procesos que no
-la tienen trabajan en vano, y el que la tiene recorre, en promedio, la mitad de su bloque.
+Su desventaja es que el speedup depende por completo de dónde cae la llave: los p − 1 procesos que
+no la tienen trabajan en vano, y con llaves pequeñas, que son las que más probablemente elige una
+persona, no gana nada.
 
 ## Intercalado
 
@@ -80,10 +72,6 @@ Su gran ventaja es que el speedup ronda p para cualquier llave, sin comunicació
 cambiando solo dos líneas respecto al naive. Como desventaja, cada proceso salta de p en p y no
 aprovecha llaves contiguas, aunque aquí eso no importa porque cada llave genera su propia agenda
 de subllaves. Además es un reparto estático: si un núcleo es más lento, todos lo esperan.
-
-Su comunicación es mínima, solo el sondeo y el aviso. La pérdida que domina la pone el hardware:
-con más núcleos activos baja el turbo, y tanto el i9 como el Apple Silicon mezclan núcleos de
-rendimiento y de eficiencia.
 
 ## Bloque-cíclico
 
@@ -103,8 +91,7 @@ parece al naive: la llave 123456, con C = 2^16, cae en el chunk 1, del proceso 1
 
 Este reparto combina el equilibrio del intercalado con el recorrido contiguo del naive, y el
 tamaño de chunk permite moverse entre ambos. A cambio, agrega un parámetro, y con chunks grandes
-respecto a la llave se pierde la consistencia. Su fuga principal es el desbalance dentro del
-último chunk, de como mucho C llaves, más la misma comunicación mínima del intercalado.
+respecto a la llave se pierde la consistencia.
 
 ## Maestro-trabajador
 
@@ -142,13 +129,9 @@ ellos. Por eso se comporta como el bloque-cíclico con p − 1 procesos: S_iter 
 con `-np 4`, y su eficiencia ideal es (p − 1)/p, 0.75 con `-np 4`.
 
 Su ventaja es el balanceo automático cuando los núcleos son desiguales o la máquina está
-compartida. Además respeta el límite `-t` con una resolución de un chunk. Su desventaja es que
-el maestro no busca, así que con pocos procesos se pierde 1/p del poder de cómputo. Con `-np 2`
-hay un solo trabajador y no puede ganarle al secuencial.
-
-Su fuga principal es una parte secuencial estructural, el maestro que solo reparte. Le sigue la
-comunicación, un pedido y una respuesta por chunk, oculta en parte por el pedido adelantado.
-Con más procesos, (p − 1)/p se acerca a 1.
+compartida, y respeta el límite `-t` con una resolución de un chunk. Su desventaja es que el
+maestro no busca, así que con pocos procesos se pierde 1/p del poder de cómputo: con `-np 2` hay
+un solo trabajador y no puede ganarle al secuencial. Con más procesos, (p − 1)/p se acerca a 1.
 
 ## Híbrido MPI + OpenMP
 
@@ -199,46 +182,46 @@ El híbrido usa todos los núcleos con pocos procesos MPI, lo que significa meno
 memoria que `intercalado -np p·T`, y conserva un speedup consistente para cualquier llave. A
 cambio, agrega un nivel de sincronización y depende de cómo el lanzador ata los procesos. Si hay
 más trabajadores que núcleos de rendimiento, los hilos que caen en núcleos de eficiencia frenan
-al resto, porque el reparto es estático.
+al resto, porque el reparto es estático. Su consistencia con la versión sin OpenMP se comprueba
+en el capítulo de resultados.
 
-La consistencia con la versión sin OpenMP se demuestra con tres comparaciones de la campaña.
-Con T = 1, el híbrido debe tardar lo mismo que el intercalado. Con T = 2 y 4, el tiempo debe
-bajar de forma pareja en las tres llaves. Frente a `intercalado -np p·T`, con los mismos
-trabajadores pero todos MPI, el tiempo debe ser parecido.
+## Resumen teórico
 
-## Tabla teórica
+La tabla reúne, para cada programa, quién tiene la llave k y tras cuántos intentos propios la
+halla. Con N = 2^b llaves, p procesos, T hilos por proceso y chunks de C = 2^c llaves:
 
-La tabla da S_iter para cada llave con 56 bits, `-np 4` y C = 2^16.
+| Programa | Quién tiene la llave | Intentos para hallarla | S_iter con `-np 4` |
+|---|---|---|---|
+| Secuencial | el único proceso | k + 1 | 1 |
+| Naive | r = ⌊k / (N/p)⌋ (el último absorbe el residuo) | k − r · (N/p) + 1 | de 1 a cerca de N/4 |
+| Intercalado | r = k mod p | ⌊k / p⌋ + 1 | ≈ 4 |
+| Bloque-cíclico | r = j mod p, con j = ⌊k / C⌋ | ⌊j / p⌋ · C + (k mod C) + 1 | ≈ 4 si k ≫ p·C |
+| Maestro-trabajador | el trabajador al que le tocó el chunk j | ≈ ⌊j / (p − 1)⌋ · C + (k mod C) + 1 | ≈ 3 |
+| Híbrido | hilo g = k mod (p·T) | ⌊k / (p·T)⌋ + 1 | ≈ 4·T |
+
+Con las llaves del enunciado (56 bits, `-np 4`, C = 2^16), esas fórmulas dan los S_iter
+siguientes:
 
 | Llave | Naive | Intercalado | Bloque-cíclico | Maestro-trabajador |
 |---|---|---|---|---|
 | a · 123456 | 1 | 4.00 | 2.13 | 2.13 |
-| b · 2^54 − 1 | 1 | 4 | 4 | 3 |
-| c · 2^54 | 1.8·10^16 (aparente) | 4 | 4 | 3 |
-| fácil · 2^55 + 1 | 1.8·10^16 (aparente) | 4 | 4 | 3 |
-| media · 2^55 + 2^53 | 5 (aparente) | 4 | 4 | 3 |
-| difícil · ⌈2^56/7 + 2^56/13⌉ | 1 | 4 | 4 | 3 |
+| b · N/4 − 1 | 1 | 4 | 4 | 3 |
+| c · N/4 | 1.8·10^16 (aparente) | 4 | 4 | 3 |
+| fácil · N/2 + 1 | 1.8·10^16 (aparente) | 4 | 4 | 3 |
+| media · N/2 + N/8 | 5 (aparente) | 4 | 4 | 3 |
+| difícil · ⌈N/7 + N/13⌉ | 1 | 4 | 4 | 3 |
 
-Los valores del naive se sacan a mano con el bloque N/4 = 2^54. La llave media, k = N/2 + N/8,
-cae en el bloque del proceso 2, que empieza en N/2 y avanza N/8 + 1 llaves. Su speedup es
-(5N/8 + 1)/(N/8 + 1), es decir, 5.
+En el naive, la difícil (cerca de 0.22·N) y la b caen en el bloque del proceso 0, que hace las
+mismas k + 1 iteraciones que el secuencial. La c es la primera llave del proceso 1 y la fácil la
+segunda del proceso 2, así que las hallan casi al instante. La media cae a la mitad del bloque
+del proceso 2, que recorre N/8 + 1 llaves frente a las 5N/8 + 1 del secuencial.
 
-La llave difícil vale cerca de 0.22·N, menos que N/4, así que cae en el bloque del proceso 0.
-Ese proceso hace las mismas k + 1 iteraciones que el secuencial y el speedup es 1. La llave c,
-N/4, es la primera del proceso 1, y la fácil, N/2 + 1, la segunda del proceso 2. En ambos casos
-el speedup ronda N/4, cerca de 1.8·10^16.
+Los presets escalan con N y cada llave conserva su posición relativa, así que con los 28 bits de
+las mediciones la tabla es la misma, salvo c y fácil en el naive, que valen cerca de 6.7·10^7.
+Por eso medir con menos bits es representativo.
 
-Con 28 bits, que son los de las mediciones, la tabla es la misma salvo c y fácil en el naive,
-que valen cerca de 6.7·10^7. Los presets escalan con N y cada llave conserva su posición
-relativa. Por eso medir con menos bits es representativo.
-
-## Consistencia frente a promedio
-
-Si la llave fuera uniforme al azar entre 0 y N, el T_p esperado del naive y del intercalado
-sería el mismo. En ambos, el proceso que la tiene recorre en promedio la mitad de N/p llaves:
-E[T_p] = N/(2p), mientras que E[T_s] = N/2. El speedup esperado es p en los dos, y el S > p del
-naive con c, fácil y media se compensa con las llaves que le dan S = 1.
-
-Lo que gana un reparto alternativo es que el speedup ya no depende de dónde cae la llave. Da
-cerca de p, o de p − 1, para cualquier llave, en vez de algo entre 1 y 10^16. Y si las llaves no
-son uniformes, por ejemplo si son pequeñas, el naive da S = 1 y el intercalado S = p.
+Si la llave fuera uniforme al azar entre 0 y N, el naive y el intercalado tendrían el mismo
+tiempo esperado: en ambos, el proceso que la tiene recorre en promedio la mitad de N/p llaves, de
+modo que E[T_p] = N/(2p) frente a E[T_s] = N/2. Lo que gana un reparto alternativo no es el
+promedio, sino que el speedup deje de depender de dónde cae la llave: cerca de p, o de p − 1,
+para cualquier llave, en lugar de algo entre 1 y 10^16.

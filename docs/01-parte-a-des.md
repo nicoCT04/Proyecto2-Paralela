@@ -5,8 +5,7 @@
 El *Data Encryption Standard* (DES) es un algoritmo de cifrado simétrico por bloques. La misma
 llave sirve para cifrar y para descifrar. Se publicó como estándar federal de Estados Unidos en
 1977, a partir del cifrado *Lucifer* de IBM, y su última revisión es la FIPS PUB 46-3 de 1999
-(NIST, 1999). El NIST lo retiró en 2005 porque su llave es demasiado corta para la capacidad de
-cómputo actual (NIST, 2005).
+(NIST, 1999).
 
 | Característica | Valor |
 |---|---|
@@ -75,12 +74,8 @@ lo evitan (Stallings, 2020). En este proyecto no importa, porque lo que se ataca
 Con 56 bits efectivos, DES quedó al alcance del *hardware* dedicado a finales de los noventa.
 En 1998, la máquina Deep Crack de la Electronic Frontier Foundation, que costó unos 250 000
 dólares, recuperó una llave en 56 horas. En enero de 1999, el DES Challenge III, resuelto por
-la EFF junto con distributed.net, lo logró en 22 horas y 15 minutos (EFF, 1998).
-
-Nuestro programa secuencial prueba unos 3·10^6 llaves por segundo en la laptop de Esteban, la
-máquina de las mediciones (sección A.3). A ese ritmo, recorrer las 2^56 llaves le tomaría unos
-770 años, y en promedio la mitad. Por eso el proyecto paraleliza la búsqueda y, para medir,
-reduce el espacio con la opción `-b`.
+la EFF junto con distributed.net, lo logró en 22 horas y 15 minutos (EFF, 1998). Una sola CPU
+está muy lejos de eso, como muestra la sección A.3.
 
 ## A.2 Diagrama de flujo
 

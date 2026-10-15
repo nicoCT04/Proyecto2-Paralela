@@ -89,33 +89,19 @@ la llave no está.
 
 ### Reflexión
 
-El tiempo del naive no depende de cuántas llaves hay que probar en total. Depende de dónde cae
-la llave dentro del bloque del proceso que la tiene: T_p ≈ (llave − inicio de su bloque + 1)
-dividido entre el ritmo de un proceso.
+El tiempo del naive no depende de cuántas llaves hay que probar en total, sino de dónde cae la
+llave dentro del bloque del proceso que la tiene: T_p ≈ (llave − inicio de su bloque + 1)
+dividido entre el ritmo de un proceso. Las llaves a y b caen en el bloque del proceso 0, que hace
+los mismos intentos que el secuencial mientras los otros tres trabajan en vano: el speedup ronda
+1, o un poco menos por el arranque de MPI y el costo de `MPI_Test`. La llave c es la primera del
+proceso 1, que la halla en un intento y da un speedup de unos 4·10^12.
 
-La llave 123456 de la prueba a cae al inicio del bloque del proceso 0. Ese proceso hace los
-mismos 123 457 intentos que el secuencial, y los otros tres no aportan nada. El speedup ronda 1:
-paralelizar no ayudó y solo agregó el costo de arrancar MPI.
-
-La llave de la prueba b es la última del proceso 0. Ese proceso recorre sus 2^54 llaves en unos
-162 años, igual que el secuencial en 149, mientras los otros tres terminan sus bloques sin
-encontrar nada. El speedup vuelve a rondar 1, o un poco menos por el costo de `MPI_Test`.
-
-La llave de la prueba c es la primera del proceso 1, que la encuentra en un solo intento y en un
-milisegundo. El secuencial tardaría 149 años, así que el speedup es de unos 4·10^12, muchísimo
-mayor que p = 4.
-
-Las llaves b y c son vecinas, pues difieren en 1. Sin embargo, una da el peor resultado posible
-y la otra un speedup astronómico. Ese S > p de la llave c no es superlinealidad real: es el
-efecto de búsqueda. El naive no hizo el trabajo más rápido; simplemente empezó a buscar justo
-donde estaba la llave. El speedup de rendimiento, que en nuestras corridas no pasa de 3.7,
-muestra lo que el paralelismo aporta de verdad.
-
-Esto deja ver la debilidad del reparto en bloques contiguos: el resultado depende de la suerte y
-no del algoritmo. Da una «falsa confianza» si se prueba con llaves al inicio de un bloque, y no
-ayuda nada si la llave cae al final del primero. Los enfoques alternativos del capítulo
-siguiente reparten las llaves para que todos los procesos avancen a la vez por las zonas bajas
-del espacio. Así el speedup se vuelve consistente y cercano a p para cualquier llave.
+Las llaves b y c son vecinas, pues difieren en 1, y sin embargo una da el peor resultado posible
+y la otra uno astronómico. Ese S > p no es superlinealidad real, sino efecto de búsqueda: el
+naive no hizo el trabajo más rápido, empezó a buscar justo donde estaba la llave, y su speedup
+de rendimiento no pasa de 3.7. El resultado del naive depende de la suerte y no del algoritmo;
+los enfoques del capítulo siguiente reparten las llaves para que todos los procesos avancen a la
+vez por las zonas bajas del espacio, de modo que el speedup sea cercano a p con cualquier llave.
 
 ### Capturas
 

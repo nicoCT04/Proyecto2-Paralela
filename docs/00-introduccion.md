@@ -44,11 +44,11 @@ La tabla resume los siete programas del proyecto y el capítulo donde se discute
 | `maestro_trabajador` | El proceso 0 reparte chunks bajo demanda | Enfoques |
 | `hibrido` | Intercalado con p procesos MPI y T hilos de OpenMP (extra) | Enfoques |
 
-Todos comparten el mismo arranque, el mismo aviso de llave y el mismo reporte, que viven en el
-módulo `search_mpi`. Todos escriben además una línea CSV con el mismo formato. Tres scripts
-completan el trabajo: `verificar.sh` comprueba que cada programa halla la llave real,
-`campana.sh` corre las mediciones con 5 repeticiones por caso y `analizar.py` genera las tablas y
-gráficas a partir de la mediana.
+Todos comparten el arranque, el aviso de llave y el reporte del módulo `search_mpi`, y escriben
+una línea CSV con el mismo formato. Tres scripts completan el trabajo: `verificar.sh` comprueba
+que cada programa halla la llave real, `campana.sh` corre las mediciones y `analizar.py` genera
+las tablas y gráficas a partir de la mediana. Un visualizador web (`visualizer/`) corre los
+programas reales y dibuja qué llaves prueba cada proceso.
 
 De los extras opcionales se abordaron dos: tres enfoques alternativos y OpenMP. El clúster en
 red local se descartó. Exigía las tres máquinas a la vez, con la misma versión de Open MPI y el
@@ -56,15 +56,9 @@ mismo sistema operativo, y mezclar macOS con Linux lo volvía frágil para el ti
 
 ## Estructura del informe
 
-Los antecedentes corresponden a la Parte A. Allí se describe el algoritmo DES con su diagrama de
-flujo, el tiempo de la búsqueda secuencial con distintas longitudes de llave, las rutinas de la
-base (`encrypt_des`, `decrypt_des`, `try_key`, `memcpy` y `strstr`) y las primitivas MPI del
-aviso de llave.
-
-El desarrollo corresponde a la Parte B. Incluye las pruebas B.1 y B.2 del naive con las llaves
-del enunciado, los enfoques alternativos con su análisis teórico y el enfoque híbrido.
-
-Los resultados están en el análisis de speedup. Ese capítulo compara los programas por llave,
-presenta el barrido de procesos, aplica Amdahl y Gustafson y discute el superlineal. Siguen las
-conclusiones y recomendaciones, las referencias y dos anexos: el catálogo de funciones (Anexo 1)
-y la bitácora de pruebas (Anexo 2).
+Los antecedentes (Parte A) describen DES, la búsqueda secuencial, las rutinas de la base y las
+primitivas MPI del aviso de llave. El desarrollo (Parte B) presenta las pruebas del naive y los
+enfoques alternativos con su análisis teórico. Los resultados comparan los programas por llave,
+explican por qué una sola llave no basta para compararlos y aplican Amdahl y Gustafson. Cierran
+las conclusiones, las referencias, el catálogo de funciones (Anexo 1) y la bitácora de pruebas
+(Anexo 2).

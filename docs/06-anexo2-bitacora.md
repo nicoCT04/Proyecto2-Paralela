@@ -28,6 +28,8 @@ OUT=resultados/secuencial_longitudes_escu.csv REPS=5 scripts/medir_longitudes.sh
 BITS=28 REPS=5 NP=4 NP_LIST="2 4 8" HYBRID_THREADS="1 2 4" scripts/campana.sh
 python3 scripts/analizar.py resultados/campana_escu_<fecha>.csv
 python3 scripts/capturas.py                           # capturas de este anexo
+BITS=26 REPS=1 NP_LIST=4 HYBRID_THREADS="1 2" KEYS="<16 llaves al azar>" scripts/campana.sh
+python3 scripts/key_position_plots.py                 # figuras 12 y 13
 ```
 
 Se usaron 28 bits, es decir, N = 2^28 = 268 435 456 llaves. Los presets escalan con N, así que
@@ -47,24 +49,18 @@ El script `scripts/verificar.sh` usa `-b 20` y corre cada programa con las 6 lla
 fácil, media y difícil) y con 2, 3 y 4 procesos. El híbrido se prueba además con 1 y 2 hilos. El
 maestro-trabajador se prueba con pocos chunks (`-b 18`), que se agotan antes de hallar la llave,
 y con un solo proceso, donde debe dar error sin colgarse. El resultado fue de 126 casos y 0
-fallas, como muestra la figura 14.
+fallas, como muestra la figura 16.
 
 ![Verificación](capturas/anexo2-verificar.png)
 
-Figura 14. Final de la salida de `scripts/verificar.sh`, con los últimos casos y el resumen.
-
-## Pruebas B.1 y B.2
-
-Las corridas del cifrado con la llave 42 y las pruebas a, b y c del naive con `-np 4` están en el
-capítulo de pruebas B, con sus capturas y el archivo `resultados/pruebas_b2.csv`. La prueba a da
-S ≈ 0.9 como mediana de 5 corridas. La b no termina con 56 bits, pues tomaría unos 149 años en
-secuencial, y con 28 bits da S = 0.96. La c la halla el proceso 1 al primer intento, con un S
-aparente de unos 3.9·10^12 con 56 bits.
+Figura 16. Final de la salida de `scripts/verificar.sh`, con los últimos casos y el resumen.
 
 ## Campaña: tiempos (mediana de 5, en segundos)
 
-La campaña tuvo 140 corridas y las 140 hallaron la llave real. El mínimo y el máximo de cada caso
-están en `resultados/analisis_escu.md`.
+La campaña tuvo 140 corridas y las 140 hallaron la llave real; el análisis no levantó ninguna
+alerta. El mínimo y el máximo de cada caso están en `resultados/analisis_escu.md`, y los
+speedups, el barrido de procesos y el híbrido se analizan en el capítulo de resultados. Las
+corridas de las pruebas B.1 y B.2 están en su capítulo y en `resultados/pruebas_b2.csv`.
 
 | Programa | p | h | fácil | media | difícil |
 |---|---|---|---|---|---|
@@ -77,28 +73,6 @@ están en `resultados/analisis_escu.md`.
 | hibrido | 4 | 2 | 7.868 | 9.842 | 3.404 |
 | hibrido | 4 | 4 | 4.044 | 5.801 | 2.029 |
 
-## Speedups (S = T_s / T_p)
-
-| Programa | w | fácil | media | difícil | E (media) |
-|---|---|---|---|---|---|
-| naive | 4 | 11 087 (aparente) | 3.95 | 0.79 | 0.99 |
-| intercalado | 4 | 3.19 | 3.25 | 3.28 | 0.81 |
-| ciclico | 4 | 3.21 | 3.21 | 3.27 | 0.80 |
-| maestro_trabajador | 4 | 2.30 | 2.32 | 2.35 | 0.58 |
-| hibrido, 1 hilo | 4 | 3.32 | 3.37 | 3.35 | 0.84 |
-| hibrido, 2 hilos | 8 | 5.69 | 5.75 | 5.91 | 0.72 |
-| hibrido, 4 hilos | 16 | 11.08 | 9.75 | 9.92 | 0.61 |
-
-El análisis no levantó ninguna alerta. Ningún enfoque alternativo da S > w y ningún programa da
-S_rend > w.
-
-## Barrido de procesos (llave media)
-
-| Programa | p = 2 | p = 4 | p = 8 |
-|---|---|---|---|
-| intercalado: T_p (s) / S | 32.565 / 1.74 | 17.414 / 3.25 | 11.301 / 5.01 |
-| maestro_trabajador: T_p (s) / S | 67.133 / 0.84 | 24.362 / 2.32 | 13.477 / 4.20 |
-
 ## Capturas
 
 Cada captura muestra la salida real de los comandos, tal como la imprimen los programas. Se
@@ -107,31 +81,31 @@ corrida suelta varían unas décimas respecto a la mediana.
 
 ![Secuencial](capturas/anexo2-secuencial.png)
 
-Figura 15. Secuencial con las llaves fácil, media y difícil; estas corridas dan el T_s.
+Figura 17. Secuencial con las llaves fácil, media y difícil; estas corridas dan el T_s.
 
 ![Naive](capturas/anexo2-naive.png)
 
-Figura 16. Naive con 4 procesos. Con la llave fácil, el proceso 2 la halla al segundo intento;
+Figura 18. Naive con 4 procesos. Con la llave fácil, el proceso 2 la halla al segundo intento;
 con la media, a la mitad de su bloque; con la difícil, el proceso 0 la halla con las mismas
 iteraciones que el secuencial.
 
 ![Intercalado](capturas/anexo2-intercalado.png)
 
-Figura 17. Intercalado con 4 procesos y las tres llaves.
+Figura 19. Intercalado con 4 procesos y las tres llaves.
 
 ![Bloque-cíclico](capturas/anexo2-ciclico.png)
 
-Figura 18. Bloque-cíclico con 4 procesos y chunks de 2^16 llaves.
+Figura 20. Bloque-cíclico con 4 procesos y chunks de 2^16 llaves.
 
 ![Maestro-trabajador](capturas/anexo2-maestro_trabajador.png)
 
-Figura 19. Maestro-trabajador con 4 procesos, es decir, un maestro y tres trabajadores.
+Figura 21. Maestro-trabajador con 4 procesos, es decir, un maestro y tres trabajadores.
 
 ![Híbrido](capturas/anexo2-hibrido.png)
 
-Figura 20. Híbrido con 4 procesos y 4 hilos por proceso.
+Figura 22. Híbrido con 4 procesos y 4 hilos por proceso.
 
 ![Barrido](capturas/anexo2-barrido.png)
 
-Figura 21. Barrido de procesos: intercalado y maestro-trabajador con 2 y 8 procesos. Solo se
+Figura 23. Barrido de procesos: intercalado y maestro-trabajador con 2 y 8 procesos. Solo se
 muestran las líneas clave de cada reporte.
