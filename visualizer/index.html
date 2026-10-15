@@ -111,6 +111,22 @@ body {
 .stepper button { border: 0; background: transparent; color: var(--ink-2); font-size: 18px; cursor: pointer; }
 .stepper button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
 
+details.explain { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface-2); }
+details.explain summary { cursor: pointer; list-style: none; padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+details.explain summary::-webkit-details-marker { display: none; }
+details.explain summary::before { content: "▸"; transition: transform 0.2s; }
+details.explain[open] summary::before { transform: rotate(90deg); }
+details.explain summary:hover { color: var(--ink); }
+.explain-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px 24px; padding: 4px 16px 18px; animation: unfold 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.explain-body section.wide { grid-column: 1 / -1; }
+.explain-body h4 { margin: 0 0 4px; font-size: 14px; color: var(--ink); }
+details.explain .explain-body p, details.explain .explain-body li { margin: 0 0 6px; font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+.explain-body ul { margin: 0 0 6px; padding-left: 18px; }
+.explain-body b { color: var(--ink); font-weight: 600; }
+@keyframes unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.preset-groups { display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.preset-group { display: grid; gap: 6px; }
+.preset-title { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; text-transform: uppercase; }
 .presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset {
   border: 1px solid var(--axis); background: transparent; color: var(--ink-2);
@@ -185,6 +201,30 @@ body {
 .lane-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .lane-title h3 { margin: 0; font-size: 17px; }
 .lane-time { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+.lane-side { display: flex; align-items: center; gap: 10px; }
+.lane.settled { animation: none; }
+.expand {
+  width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--axis); background: transparent;
+  color: var(--ink-2); display: inline-grid; place-items: center; cursor: pointer; flex: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.expand:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); border-color: var(--ink-2); }
+.expand:active { transform: scale(0.92); }
+.expand .i-close { display: none; }
+.lane.expanded .expand .i-open { display: none; }
+.lane.expanded .expand .i-close { display: inline; }
+.lane-placeholder { border-radius: 14px; border: 1px dashed var(--hairline); }
+.stage { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 3vh 3vw; }
+.stage.open { display: grid; }
+.stage-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.stage-body { position: relative; width: min(1500px, 94vw); max-height: 94vh; display: grid; }
+.lane.expanded { max-height: 94vh; overflow: auto; padding: 28px 32px; gap: 14px; font-size: 16px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45); }
+.lane.expanded .lane-title h3 { font-size: 26px; }
+.lane.expanded .lane-time { font-size: 38px; }
+.lane.expanded .lane-desc, .lane.expanded .lane-predict, .lane.expanded .lane-result { font-size: 15px; }
+.lane.expanded .lens { height: 64px; }
+.lane.expanded .legend { font-size: 14px; }
+body.staged { overflow: hidden; }
 .pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--hairline); white-space: nowrap; }
 .lane[data-state="running"] .pill { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .lane[data-state="running"] .pill::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; animation: blink 1s ease-in-out infinite; }
@@ -219,19 +259,21 @@ details.console pre { margin: 6px 0 0; max-height: 220px; overflow: auto; paddin
 .summary.visible { display: block; }
 .summary h2, .help h2 { margin: 0 0 4px; font-size: 17px; }
 .summary p { margin: 0 0 12px; color: var(--ink-2); font-size: 13px; }
+.table-explain { margin-top: 14px; }
 .table-scroll { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--hairline); white-space: nowrap; font-variant-numeric: tabular-nums; }
 th { color: var(--muted); font-weight: 600; font-size: 12px; }
 th:first-child, td:first-child { text-align: left; }
 td .tag { margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--good); }
+td .tag.warn { color: var(--critical); }
 tr.best td { background: color-mix(in srgb, var(--good) 6%, transparent); }
 
 .help { margin-top: 16px; padding: 18px; display: grid; gap: 8px; }
 .help ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; display: grid; gap: 4px; }
 
 .tooltip {
-  position: fixed; z-index: 10; pointer-events: none; max-width: 300px;
+  position: fixed; z-index: 30; pointer-events: none; max-width: 300px;
   background: var(--surface); color: var(--ink); border: 1px solid var(--border);
   border-radius: 10px; padding: 8px 10px; font-size: 12px; line-height: 1.45;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); opacity: 0; transform: translateY(4px);
@@ -277,15 +319,6 @@ tr.best td { background: color-mix(in srgb, var(--good) 6%, transparent); }
       <div class="field wide">
         <label for="key">Llave privada (-k)</label>
         <input id="key" class="text-input" inputmode="numeric" autocomplete="off" spellcheck="false" value="60000000">
-        <div class="presets" id="presets">
-          <button class="preset" data-preset="a" type="button">a</button>
-          <button class="preset" data-preset="b" type="button">b</button>
-          <button class="preset" data-preset="c" type="button">c</button>
-          <button class="preset" data-preset="facil" type="button">fácil</button>
-          <button class="preset" data-preset="media" type="button">media</button>
-          <button class="preset" data-preset="dificil" type="button">difícil</button>
-          <button class="preset" data-preset="random" type="button">al azar</button>
-        </div>
       </div>
       <div class="field">
         <label for="bits">Bits (-b)</label>
@@ -313,6 +346,72 @@ tr.best td { background: color-mix(in srgb, var(--good) 6%, transparent); }
         <span class="hint">Por programa</span>
       </div>
     </div>
+
+    <div class="preset-groups" id="presets">
+      <div class="preset-group">
+        <span class="preset-title">Pruebas a, b y c (Parte B.2)</span>
+        <div class="presets">
+          <button class="preset" data-preset="a" type="button" title="Prueba a del enunciado: la llave 123 456, muy al inicio del espacio. La tiene el proceso 0 del naive, que tarda lo mismo que el secuencial.">a · 123 456, al inicio</button>
+          <button class="preset" data-preset="b" type="button" title="Prueba b del enunciado: N/4 − 1, la última llave del bloque del proceso 0. Es el peor caso del naive: recorre todo su bloque, igual que el secuencial.">b · última del bloque de P0</button>
+          <button class="preset" data-preset="c" type="button" title="Prueba c del enunciado: N/4, la primera llave del bloque del proceso 1. Es el mejor caso del naive: la halla al primer intento.">c · primera del bloque de P1</button>
+        </div>
+      </div>
+      <div class="preset-group">
+        <span class="preset-title">Llaves del enunciado (dificultad para el naive)</span>
+        <div class="presets">
+          <button class="preset" data-preset="facil" type="button" title="Fácil (N/2 + 1): la segunda llave del bloque del proceso 2, así que el naive la halla casi al instante. Para el secuencial está a la mitad del espacio.">fácil · N/2 + 1</button>
+          <button class="preset" data-preset="media" type="button" title="Media (N/2 + N/8): cae a la mitad del bloque del proceso 2 del naive.">media · N/2 + N/8</button>
+          <button class="preset" data-preset="dificil" type="button" title="Difícil (N/7 + N/13, cerca del 22 % del espacio): cae en el bloque del proceso 0 del naive, que tarda lo mismo que el secuencial.">difícil · N/7 + N/13</button>
+        </div>
+      </div>
+      <div class="preset-group">
+        <span class="preset-title">Otras</span>
+        <div class="presets">
+          <button class="preset" data-preset="random" type="button" title="Una llave cualquiera dentro del espacio, distinta cada vez.">al azar</button>
+          <button class="preset" data-preset="presentacion" type="button" title="32 000 000 con 26 bits (la misma posición relativa con otros bits): secuencial, naive, maestro-trabajador, intercalado y cíclico, híbrido, del más lento al más rápido">presentación · orden esperado</button>
+        </div>
+      </div>
+    </div>
+
+    <details class="explain">
+      <summary>¿Qué significa cada parámetro?</summary>
+      <div class="explain-body">
+        <section>
+          <h4>Llave privada (-k)</h4>
+          <p>Es el número secreto con el que se cifró el texto y que los programas tienen que adivinar. Todos prueban llaves hasta dar con esta. Su <b>posición</b> dentro del espacio decide cuánto tarda cada programa: por eso conviene probar varias, no una sola.</p>
+        </section>
+        <section>
+          <h4>Bits (-b)</h4>
+          <p>Dice cuántas llaves posibles hay: 2 elevado a ese número. Con 26 bits son 67 108 864 llaves. DES real usa 56 bits, pero recorrerlas tomaría siglos, así que se achica el espacio para poder medir. Cada bit de más duplica las llaves y el tiempo. Los botones de llaves se ajustan solos a los bits para caer siempre en la misma posición relativa: a, b y c son las pruebas de la Parte B.2; fácil, media y difícil son las llaves del enunciado, nombradas por lo difícil que son para el naive con 4 procesos.</p>
+        </section>
+        <section>
+          <h4>Procesos (-np)</h4>
+          <p>Cuántos programas independientes lanza MPI para repartirse el trabajo. Cada proceso tiene su propia memoria y se comunica con mensajes. En el naive, el intercalado y el cíclico buscan todos; en el maestro-trabajador uno de ellos, el maestro, solo reparte trabajo y no busca, así que con 4 procesos buscan 3. El secuencial siempre es uno solo.</p>
+        </section>
+        <section>
+          <h4>Hilos del híbrido (OMP_NUM_THREADS)</h4>
+          <p>Solo afecta al híbrido. Cada proceso MPI se divide en varios hilos que comparten su memoria y buscan a la vez. Con 4 procesos y 2 hilos hay 8 trabajadores: por eso el híbrido suele ser el más rápido. No es que reparta mejor, es que tiene el doble de manos.</p>
+        </section>
+        <section class="wide">
+          <h4>Chunk (-c bits): el tamaño del paquete de trabajo</h4>
+          <p>Un chunk es un <b>paquete de llaves seguidas</b> que se entrega de una sola vez a un proceso. Con 16 bits, cada paquete tiene 2<sup>16</sup> = 65 536 llaves. Solo lo usan el cíclico y el maestro-trabajador, que son los que reparten por paquetes. Piénsalo como repartir naipes: se pueden dar de a una carta o de a montones.</p>
+          <ul>
+            <li><b>En el cíclico</b>, los paquetes se reparten en ronda: el primero al proceso 0, el segundo al 1, el tercero al 2, el cuarto al 3 y vuelta a empezar. Con paquetes de una sola llave es exactamente el intercalado; con un paquete gigante por proceso es exactamente el naive. El chunk es la perilla que mueve el cíclico entre esos dos extremos.</li>
+            <li><b>En el maestro-trabajador</b>, el chunk es lo que el maestro entrega cada vez que un trabajador le pide trabajo. Cada entrega cuesta un mensaje de ida y uno de vuelta.</li>
+          </ul>
+          <p><b>Por qué no es fijo:</b> no existe un tamaño perfecto para todo, es un equilibrio.</p>
+          <ul>
+            <li><b>Paquetes chicos</b>: el trabajo queda bien repartido y todos avanzan parejo, pero en el maestro-trabajador hay muchísimos mensajes, y el maestro se vuelve un cuello de botella.</li>
+            <li><b>Paquetes grandes</b>: casi no hay mensajes, pero el reparto se vuelve disparejo y el cíclico empieza a parecerse al naive, con su dependencia de dónde cae la llave. Por ejemplo, la llave 123 456 cae dentro del segundo paquete y el cíclico solo la halla 2.13 veces más rápido, no 4.</li>
+          </ul>
+          <p>Con 16 bits, cada paquete toma unos 25 milésimos de segundo de trabajo: suficiente para que el costo de los mensajes no se note y lo bastante chico para que el reparto quede parejo. Por eso es el valor por defecto. Se deja como opción para poder experimentar ese equilibrio, que es parte del análisis del curso. Tiene que ser menor que los bits, porque con un solo paquete no hay nada que repartir.</p>
+        </section>
+        <section>
+          <h4>Límite (-t s)</h4>
+          <p>Tiempo máximo que se le da a cada programa. Es un seguro: si no halla la llave en ese tiempo, se detiene y la marca como «sin hallar». Con 26 bits nunca se llega (el más lento tarda unos 20 s); sirve si subes mucho los bits.</p>
+        </section>
+      </div>
+    </details>
 
     <div class="field">
       <span class="label">Algoritmos</span>
@@ -348,19 +447,56 @@ tr.best td { background: color-mix(in srgb, var(--good) 6%, transparent); }
       <table>
         <thead>
           <tr>
-            <th>Programa</th><th>Buscan</th><th>Tiempo</th><th>La halló</th><th>Intentos de ese proceso</th>
-            <th>Llaves probadas</th><th>Llaves/s por trabajador</th><th>Speedup</th><th>Speedup por intentos</th>
+            <th>Programa</th><th>Buscan</th><th>Tiempo</th><th>La halló</th><th>Llaves probadas</th>
+            <th>Speedup teórico</th><th>Speedup práctico</th><th>Eficiencia</th>
           </tr>
         </thead>
         <tbody id="summary-body"></tbody>
       </table>
     </div>
+    <details class="explain table-explain">
+      <summary>¿Qué significa cada columna?</summary>
+      <div class="explain-body">
+        <section>
+          <h4>Buscan</h4>
+          <p>Cuántos procesos o hilos están probando llaves al mismo tiempo. En el maestro-trabajador aparece «3 + maestro» porque el maestro solo reparte trabajo. En el híbrido son procesos × hilos.</p>
+        </section>
+        <section>
+          <h4>Tiempo</h4>
+          <p>Lo que tardó el programa en hallar la llave, medido por el propio programa desde que todos arrancan hasta que llega el aviso de «la encontré». No incluye el arranque de MPI.</p>
+        </section>
+        <section>
+          <h4>La halló</h4>
+          <p>Qué proceso encontró la llave (P0, P1, …; en el híbrido, proceso y hilo, como P0·h1). Sirve para comprobar el reparto: según dónde cae la llave, las fórmulas dicen de antemano quién la tiene, y siempre coincide.</p>
+        </section>
+        <section>
+          <h4>Llaves probadas</h4>
+          <p>Todas las llaves que probaron entre todos los procesos hasta detenerse. Puede ser mayor que en el secuencial: en el naive, mientras uno se acerca a la llave, los demás prueban en sus bloques sin encontrar nada. Es trabajo que se hizo, aunque no sirviera.</p>
+        </section>
+        <section>
+          <h4>Speedup teórico</h4>
+          <p>Cuántas veces más rápido <b>debería</b> ser, solo contando intentos: las llaves que prueba el secuencial (k + 1) entre las que necesita el proceso que la halla. No depende de la computadora, solo del reparto y de dónde cae la llave. Con 4 procesos, el intercalado da 4 con cualquier llave; el naive puede dar 1 o muchísimo más, según la suerte.</p>
+        </section>
+        <section>
+          <h4>Speedup práctico</h4>
+          <p>Cuántas veces más rápido <b>fue</b> de verdad: el tiempo del secuencial entre el tiempo del programa. Casi siempre queda por debajo del teórico, porque con varios núcleos ocupados el procesador baja su velocidad y MPI agrega algo de comunicación. Solo aparece si se corrió el secuencial con la misma llave.</p>
+        </section>
+        <section>
+          <h4>Eficiencia</h4>
+          <p>Qué tan bien se aprovechó cada proceso: el speedup práctico entre los procesos usados. 1.00 sería perfecto: 4 procesos, 4 veces más rápido. Un 0.80 significa que cada proceso rindió el 80 % de lo que rendiría solo. En el maestro-trabajador se cuenta al maestro, porque ocupa un núcleo aunque no busque.</p>
+        </section>
+        <section>
+          <h4>Las etiquetas</h4>
+          <p><b>«más rápido»</b> marca el programa con menor tiempo. <b>«aparente»</b> marca una eficiencia mayor que 1: ningún proceso puede rendir más del 100 %, así que ese resultado no viene del paralelismo sino de que la llave cayó cerca del inicio de un bloque.</p>
+        </section>
+      </div>
+    </details>
   </section>
 
   <section class="card help">
     <h2>Cómo leer cada rectángulo</h2>
     <ul>
-      <li>El rectángulo es todo el espacio de llaves, leído como un texto: de la llave 0 (arriba a la izquierda) a la 2<sup>b</sup> − 1 (abajo a la derecha). Cada píxel agrupa varias llaves seguidas.</li>
+      <li>El rectángulo es todo el espacio de llaves, leído por columnas: la llave 0 está arriba a la izquierda, las llaves bajan por cada columna y las columnas avanzan hacia la derecha hasta la 2<sup>b</sup> − 1. Por eso la búsqueda se va llenando hacia la derecha. Cada píxel agrupa varias llaves seguidas.</li>
       <li>El color dice qué proceso es dueño de esas llaves: tenue si todavía no las prueba, intenso si ya las probó. El círculo marca la llave buscada y los puntos, por dónde va cada proceso.</li>
       <li>Donde el reparto es más fino que un píxel (intercalado, híbrido) el rectángulo se ve rayado: cada raya es un proceso distinto. La lupa de abajo muestra las llaves una por una alrededor de la llave buscada.</li>
       <li>En el maestro-trabajador el proceso 0 no prueba llaves: reparte chunks a pedido, y cada chunk se pinta del trabajador que lo tomó.</li>
@@ -368,6 +504,10 @@ tr.best td { background: color-mix(in srgb, var(--good) 6%, transparent); }
       <li>El navegador también usa CPU mientras dibuja: para los tiempos del informe, la medición oficial sigue siendo la de la terminal (<span class="mono">scripts/campana.sh</span>).</li>
     </ul>
   </section>
+</div>
+<div class="stage" id="stage" role="dialog" aria-modal="true" aria-label="Algoritmo en pantalla grande">
+  <div class="stage-backdrop" id="stage-backdrop"></div>
+  <div class="stage-body" id="stage-body"></div>
 </div>
 <div class="tooltip" id="tooltip" role="tooltip"></div>
 
@@ -623,7 +763,15 @@ class Lane {
     this.pill = el("span", "pill", "En espera");
     title.append(this.pill);
     this.timeEl = el("div", "lane-time num", "—");
-    head.append(title, this.timeEl);
+    this.expandBtn = el("button", "expand");
+    this.expandBtn.type = "button";
+    this.expandBtn.setAttribute("aria-label", "Ver en pantalla grande");
+    this.expandBtn.title = "Ver en pantalla grande";
+    this.expandBtn.innerHTML = EXPAND_ICON;
+    this.expandBtn.addEventListener("click", () => (stage.lane === this ? closeStage() : openStage(this)));
+    const side = el("div", "lane-side");
+    side.append(this.timeEl, this.expandBtn);
+    head.append(title, side);
 
     const desc = el("p", "lane-desc", this.describe());
     const predict = el("p", "lane-predict");
@@ -659,7 +807,8 @@ class Lane {
     this.canvas.addEventListener("mouseleave", hideTooltip);
     this.lens.addEventListener("mousemove", (e) => this.hoverLens(e));
     this.lens.addEventListener("mouseleave", hideTooltip);
-    new ResizeObserver(() => { this.dirty = true; scheduleRender(); }).observe(wrap);
+    root.addEventListener("animationend", () => root.classList.add("settled"), { once: true });
+    new ResizeObserver(() => { this.dirty = true; scheduleRender(); }).observe(root);
   }
 
   describe() {
@@ -829,9 +978,9 @@ class Lane {
     const o = { w: 0, pos: 0, span: 1 };
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        const c = y * W + x;
+        const c = x * H + y;
         const a = c * s;
-        const idx = c * 4;
+        const idx = (y * W + x) * 4;
         if (model.sample(a, s, x, y, o, view)) {
           const f = clamp((iters[o.w] - o.pos) / o.span, 0, 1);
           const col = colors[o.w];
@@ -852,7 +1001,7 @@ class Lane {
   cellCenter(key, cw, ch) {
     const { W, H, s } = this.grid;
     const c = Math.floor(key / s);
-    return [((c % W) + 0.5) * (cw / W), (Math.floor(c / W) + 0.5) * (ch / H)];
+    return [(Math.floor(c / H) + 0.5) * (cw / W), ((c % H) + 0.5) * (ch / H)];
   }
 
   paintOverlay(view, found) {
@@ -937,7 +1086,7 @@ class Lane {
     const bw = (cw - gap * (n - 1)) / n;
     const top = 4;
     const bh = ch - 8;
-    ctx.font = `600 ${bw < 11 ? 9 : 10}px system-ui, sans-serif`;
+    ctx.font = `600 ${clamp(Math.round(bw * 0.42), 9, 18)}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (let i = 0; i < n; i++) {
@@ -968,7 +1117,7 @@ class Lane {
     const { W, H, s } = this.grid;
     const x = clamp(Math.floor(((e.clientX - rect.left) / rect.width) * W), 0, W - 1);
     const y = clamp(Math.floor(((e.clientY - rect.top) / rect.height) * H), 0, H - 1);
-    const c = BigInt(y * W + x);
+    const c = BigInt(x * H + y);
     const sB = BigInt(s);
     const first = c * sB;
     const last = first + sB - 1n;
@@ -1018,6 +1167,78 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+const EXPAND_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="i-open" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/><path class="i-close" d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>';
+const stage = { lane: null, placeholder: null, busy: false };
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function flip(node, from, to, duration) {
+  if (reducedMotion.matches) return Promise.resolve();
+  const dx = from.left - to.left;
+  const dy = from.top - to.top;
+  const sx = from.width / to.width;
+  const sy = from.height / to.height;
+  return node.animate([
+    { transformOrigin: "top left", transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
+    { transformOrigin: "top left", transform: "none" },
+  ], { duration, easing: "cubic-bezier(0.22, 1.18, 0.36, 1)" }).finished;
+}
+
+async function openStage(lane) {
+  if (stage.busy || stage.lane) return;
+  stage.busy = true;
+  hideTooltip();
+  const root = lane.root;
+  const from = root.getBoundingClientRect();
+  const placeholder = el("div", "lane-placeholder");
+  placeholder.style.height = `${from.height}px`;
+  root.replaceWith(placeholder);
+  stage.lane = lane;
+  stage.placeholder = placeholder;
+  const host = $("#stage");
+  host.classList.add("open");
+  $("#stage-body").append(root);
+  root.classList.add("expanded");
+  document.body.classList.add("staged");
+  lane.dirty = true;
+  lane.render(currentView(lane), currentFound(lane));
+  const to = root.getBoundingClientRect();
+  host.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion.matches ? 0 : 280, easing: "ease-out" });
+  await flip(root, from, to, 560);
+  stage.busy = false;
+}
+
+async function closeStage() {
+  if (stage.busy || !stage.lane) return;
+  stage.busy = true;
+  hideTooltip();
+  const lane = stage.lane;
+  const root = lane.root;
+  const host = $("#stage");
+  const from = root.getBoundingClientRect();
+  const fade = host.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reducedMotion.matches ? 0 : 260, easing: "ease-in", fill: "forwards" });
+  root.classList.remove("expanded");
+  stage.placeholder.replaceWith(root);
+  document.body.classList.remove("staged");
+  const to = root.getBoundingClientRect();
+  lane.dirty = true;
+  lane.render(currentView(lane), currentFound(lane));
+  await Promise.all([flip(root, from, to, 460), fade.finished]);
+  fade.cancel();
+  host.classList.remove("open");
+  stage.lane = null;
+  stage.placeholder = null;
+  stage.busy = false;
+}
+
+function currentView(lane) {
+  return state.replay && state.replay.views.get(lane) ? state.replay.views.get(lane) : lane.view;
+}
+
+function currentFound(lane) {
+  const view = currentView(lane);
+  return view.finished && lane.status === "found";
+}
+
 const tooltip = $("#tooltip");
 function showTooltip(e, html) {
   tooltip.innerHTML = html;
@@ -1039,7 +1260,14 @@ function scheduleRender() {
   renderQueued = true;
   requestAnimationFrame(() => {
     renderQueued = false;
-    if (state.replay && state.replay.active) return;
+    if (state.replay && state.replay.active) {
+      for (const lane of state.lanes) {
+        if (!lane.dirty) continue;
+        const view = state.replay.views.get(lane) || lane.view;
+        lane.render(view, view.finished && lane.status === "found");
+      }
+      return;
+    }
     const now = performance.now();
     for (const lane of state.lanes) {
       if (lane.dirty && (lane.status !== "running" || now - (lane.lastPaint || 0) >= LIVE_FRAME_MS)) lane.render();
@@ -1090,6 +1318,7 @@ function presetKey(name, bits) {
     case "facil": return N / 2n + 1n;
     case "media": return N / 2n + N / 8n;
     case "dificil": return (20n * N + 90n) / 91n;
+    case "presentacion": return (N * 32000000n) / (1n << 26n);
     default: {
       const words = crypto.getRandomValues(new Uint32Array(2));
       const raw = (BigInt(words[0]) << 32n) | BigInt(words[1]);
@@ -1239,26 +1468,27 @@ function updateSummary() {
     if (lane === best && found.length > 1) nameCell.append(el("span", "tag", "más rápido"));
     const searching = lane.model.searching;
     const ok = r.found !== "NA";
-    const speedup = seq && ok ? (seq.result.time / r.time).toFixed(2) : "—";
-    const iterSpeed = ok ? (Number(cfg.key + 1n) / r.iterations).toFixed(2) : "—";
-    const rate = r.time > 0 ? r.total / r.time / searching : 0;
+    const workers = lane.algo.id === "maestro_trabajador" ? lane.model.p : searching;
+    const prediction = lane.model.predict();
+    const theory = Number(cfg.key + 1n) / Number(prediction.it);
+    const practical = seq && ok ? seq.result.time / r.time : null;
+    const efficiency = practical === null ? null : practical / workers;
+    const effCell = el("td", "", efficiency === null ? "—" : efficiency.toFixed(2));
+    if (efficiency !== null && efficiency > 1) effCell.append(el("span", "tag warn", "aparente"));
     const cells = [
       nameCell,
       el("td", "", lane.algo.id === "maestro_trabajador" ? `${searching} + maestro` : String(searching)),
       el("td", "", ok ? fmtSeconds(r.time) : `> ${cfg.limit} s`),
       el("td", "", ok ? lane.finderLabel() : "—"),
-      el("td", "", ok ? fmtInt(r.iterations) : "—"),
       el("td", "", fmtInt(r.total)),
-      el("td", "", fmtRate(rate)),
-      el("td", "", speedup),
-      el("td", "", iterSpeed),
+      el("td", "", `${prediction.approx ? "≈ " : ""}${theory.toFixed(2)}`),
+      el("td", "", practical === null ? "—" : practical.toFixed(2)),
+      effCell,
     ];
     tr.append(...cells);
     body.append(tr);
   }
-  $("#summary-note").textContent = seq
-    ? `Llave ${fmtInt(cfg.key)} en 2^${cfg.bits}. Speedup = tiempo del secuencial ÷ tiempo del programa; el de intentos no depende del hardware.`
-    : `Llave ${fmtInt(cfg.key)} en 2^${cfg.bits}. Incluye el secuencial para calcular el speedup por tiempo.`;
+  $("#summary-note").textContent = `Llave ${fmtInt(cfg.key)} en 2^${cfg.bits}. Speedup teórico = intentos del secuencial ÷ intentos del proceso que la halla, según las fórmulas de cada reparto. Speedup práctico = tiempo medido del secuencial ÷ tiempo medido del programa. Eficiencia = speedup práctico ÷ procesos (o trabajadores en el híbrido; el maestro cuenta aunque no busque).${seq ? "" : " Incluye el secuencial para calcular el speedup práctico y la eficiencia."}`;
 }
 
 function buildTracks(lane) {
@@ -1440,6 +1670,8 @@ function wireControls() {
   $("#stop").addEventListener("click", stopBatch);
   $("#key").addEventListener("keydown", (e) => { if (e.key === "Enter" && !state.running) runBatch(); });
   $("#replay-btn").addEventListener("click", startReplay);
+  $("#stage-backdrop").addEventListener("click", closeStage);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && stage.lane) closeStage(); });
   for (const button of document.querySelectorAll("#speed button")) {
     button.addEventListener("click", () => {
       state.speed = Number(button.dataset.speed);
