@@ -22,7 +22,7 @@ int main(int argc, char **argv)
     program_options_t opts;
     crack_problem_t problem;
 
-    int status = parse_options(argc, argv, "secuencial", 0, &opts);
+    int status = parse_options(argc, argv, "secuencial", OPT_PROGRESS, &opts);
     if (status != OPTIONS_OK) {
         return status == OPTIONS_HELP ? EXIT_SUCCESS : EXIT_FAILURE;
     }
@@ -51,6 +51,9 @@ int main(int argc, char **argv)
             && wall_seconds() >= deadline) {
             break;
         }
+        if (opts.progress && (result.iterations & (PROGRESS_INTERVAL - 1)) == 0) {
+            print_progress(0, result.iterations, wall_seconds() - start);
+        }
         ++result.iterations;
         if (try_key(key, problem.cipher, problem.cipher_length, problem.phrase, workspace)) {
             result.found_key   = key;
@@ -61,6 +64,9 @@ int main(int argc, char **argv)
     }
     result.elapsed_s  = wall_seconds() - start;
     result.total_keys = result.iterations;
+    if (opts.progress) {
+        print_progress(0, result.iterations, result.elapsed_s);
+    }
 
     if (result.found || deadline > 0.0) {
         problem_print_result("secuencial", &opts, &problem, &result);

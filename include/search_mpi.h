@@ -114,6 +114,9 @@ void found_listener_announce(const mpi_search_t *search, uint64_t key, uint64_t 
 int found_listener_try_key(found_listener_t *listener, const mpi_search_t *search,
                            uint64_t key, uint64_t *iterations);
 
+void found_listener_progress(const found_listener_t *listener, const mpi_search_t *search,
+                             int worker, uint64_t iterations);
+
 /**
  * @brief  Espera el aviso (el proceso 0 sigue vigilando el límite) y arma el resultado.
  * @param  listener  Antena.

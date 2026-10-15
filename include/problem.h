@@ -24,6 +24,8 @@
 /** Cada cuántas llaves se revisan los mensajes MPI y el límite de tiempo (potencia de 2). */
 #define POLL_INTERVAL 4096
 
+#define PROGRESS_INTERVAL (POLL_INTERVAL * 32)
+
 /** Datos que necesita la búsqueda de la llave. */
 typedef struct {
     char          *plain_text;     /**< Texto original leído del .txt. */
@@ -91,5 +93,9 @@ void print_hex(const char *label, const unsigned char *bytes, size_t length);
 
 /** @brief Reloj de pared monotónico, en segundos. */
 double wall_seconds(void);
+
+void print_progress(int worker, uint64_t iterations, double elapsed_s);
+
+void print_chunk(int worker, uint64_t first_key, double elapsed_s);
 
 #endif /* PROBLEM_H */

@@ -42,6 +42,9 @@ static void print_usage(const char *program, int flags)
     if (flags & OPT_OUTPUT) {
         fprintf(stderr, "  -o  guarda el texto cifrado en un archivo binario\n");
     }
+    if (flags & OPT_PROGRESS) {
+        fprintf(stderr, "  -v  imprime el avance de la búsqueda (líneas PROGRESS y CHUNK)\n");
+    }
     fprintf(stderr, "  -h  muestra esta ayuda\n");
 }
 
@@ -117,6 +120,9 @@ int parse_options(int argc, char **argv, const char *program,
     if (flags & OPT_CHUNK) {
         strcat(optstring, "c:");
     }
+    if (flags & OPT_PROGRESS) {
+        strcat(optstring, "v");
+    }
     int option;
 
     opts->text_path   = NULL;
@@ -127,6 +133,7 @@ int parse_options(int argc, char **argv, const char *program,
     opts->time_limit_s = 0;
     opts->chunk_bits  = DEFAULT_CHUNK_BITS;
     opts->output_path = NULL;
+    opts->progress    = 0;
 
     opterr = 0;  /* Los mensajes de error los damos nosotros, en español. */
     while ((option = getopt(argc, argv, optstring)) != -1) {
@@ -135,6 +142,7 @@ int parse_options(int argc, char **argv, const char *program,
         case 'k': opts->key_text    = optarg; break;
         case 'p': opts->phrase      = optarg; break;
         case 'o': opts->output_path = optarg; break;
+        case 'v': opts->progress    = 1; break;
         case 'b': {
             uint64_t bits;
             if (parse_u64(optarg, &bits) != 0 || bits < MIN_KEY_BITS || bits > DES_KEY_BITS) {

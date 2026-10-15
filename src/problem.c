@@ -180,3 +180,15 @@ double wall_seconds(void)
     clock_gettime(CLOCK_MONOTONIC, &now);
     return (double)now.tv_sec + (double)now.tv_nsec * 1e-9;
 }
+
+void print_progress(int worker, uint64_t iterations, double elapsed_s)
+{
+    printf("PROGRESS,%d,%llu,%.6f\n", worker, (unsigned long long)iterations, elapsed_s);
+    fflush(stdout);
+}
+
+void print_chunk(int worker, uint64_t first_key, double elapsed_s)
+{
+    printf("CHUNK,%d,%llu,%.6f\n", worker, (unsigned long long)first_key, elapsed_s);
+    fflush(stdout);
+}

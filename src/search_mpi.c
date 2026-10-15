@@ -20,6 +20,7 @@
 /** Posiciones del encabezado que el proceso 0 difunde antes del problema. */
 enum {
     HDR_STATUS, HDR_KEY_BITS, HDR_CIPHER_LENGTH, HDR_PHRASE_LENGTH, HDR_TIME_LIMIT, HDR_CHUNK_BITS,
+    HDR_PROGRESS,
     HDR_COUNT
 };
 
@@ -69,6 +70,7 @@ static int share_problem(mpi_search_t *search, int status)
             header[HDR_PHRASE_LENGTH] = strlen(problem->phrase);
             header[HDR_TIME_LIMIT]    = (uint64_t)search->opts.time_limit_s;
             header[HDR_CHUNK_BITS]    = (uint64_t)search->opts.chunk_bits;
+            header[HDR_PROGRESS]      = (uint64_t)search->opts.progress;
         }
     }
     MPI_Bcast(header, HDR_COUNT, MPI_UINT64_T, 0, MPI_COMM_WORLD);
@@ -85,6 +87,7 @@ static int share_problem(mpi_search_t *search, int status)
         problem->phrase            = malloc(header[HDR_PHRASE_LENGTH] + 1);
         search->opts.time_limit_s  = (int)header[HDR_TIME_LIMIT];
         search->opts.chunk_bits    = (int)header[HDR_CHUNK_BITS];
+        search->opts.progress      = (int)header[HDR_PROGRESS];
         if (problem->cipher == NULL || problem->phrase == NULL) {
             fprintf(stderr, "Error: sin memoria en el proceso %d.\n", search->rank);
             MPI_Abort(MPI_COMM_WORLD, 1);
@@ -111,7 +114,7 @@ int mpi_search_setup(int *argc, char ***argv, const char *program, int option_fl
     /* Solo el proceso 0 lee parámetros y archivo: los errores salen una vez. */
     int status = SEARCH_READY;
     if (search->rank == 0) {
-        int parsed = parse_options(*argc, *argv, program, option_flags, &search->opts);
+        int parsed = parse_options(*argc, *argv, program, option_flags | OPT_PROGRESS, &search->opts);
         if (parsed == OPTIONS_HELP) {
             status = SEARCH_HELP;
         } else if (parsed != OPTIONS_OK
@@ -216,11 +219,24 @@ void found_listener_announce(const mpi_search_t *search, uint64_t key, uint64_t 
     notify_all(message, search->size);
 }
 
+void found_listener_progress(const found_listener_t *listener, const mpi_search_t *search,
+                             int worker, uint64_t iterations)
+{
+    if (search->opts.progress) {
+        print_progress(worker, iterations, MPI_Wtime() - listener->start);
+    }
+}
+
 int found_listener_try_key(found_listener_t *listener, const mpi_search_t *search,
                            uint64_t key, uint64_t *iterations)
 {
-    if ((*iterations & (POLL_INTERVAL - 1)) == 0 && found_listener_poll(listener, search)) {
-        return 1;
+    if ((*iterations & (POLL_INTERVAL - 1)) == 0) {
+        if ((*iterations & (PROGRESS_INTERVAL - 1)) == 0) {
+            found_listener_progress(listener, search, search->rank, *iterations);
+        }
+        if (found_listener_poll(listener, search)) {
+            return 1;
+        }
     }
     ++*iterations;
     if (try_key(key, search->problem.cipher, search->problem.cipher_length,

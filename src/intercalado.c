@@ -36,6 +36,7 @@ int main(int argc, char **argv)
             break;
         }
     }
+    found_listener_progress(&listener, &search, search.rank, iterations);
 
     search_result_t result;
     found_listener_finish(&listener, &search, &result);

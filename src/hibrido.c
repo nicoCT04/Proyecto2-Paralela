@@ -32,6 +32,7 @@ typedef struct {
     uint64_t   key;         /**< Llave hallada. */
     uint64_t   iterations;  /**< Llaves que probó el hilo que la halló. */
     int        no_memory;   /**< 1 si algún hilo no pudo reservar su workspace. */
+    double     start;
 } thread_shared_t;
 
 /**
@@ -99,6 +100,7 @@ static uint64_t search_thread(found_listener_t *listener, const mpi_search_t *se
     const crack_problem_t *problem = &search->problem;
     const uint64_t stride = (uint64_t)search->size * (uint64_t)threads;
     const uint64_t first = (uint64_t)search->rank * (uint64_t)threads + (uint64_t)thread;
+    const int worker = (int)first;
 
     unsigned char *workspace = malloc(problem->cipher_length + 1);
     if (workspace == NULL) {
@@ -110,6 +112,9 @@ static uint64_t search_thread(found_listener_t *listener, const mpi_search_t *se
     uint64_t iterations = 0;
     for (uint64_t key = first; key < problem->key_space; key += stride) {
         if ((iterations & (POLL_INTERVAL - 1)) == 0) {
+            if (search->opts.progress && (iterations & (PROGRESS_INTERVAL - 1)) == 0) {
+                print_progress(worker, iterations, wall_seconds() - shared->start);
+            }
             if (thread == 0 && found_listener_poll(listener, search)) {
                 atomic_store(&shared->stop, 1);
             }
@@ -130,6 +135,9 @@ static uint64_t search_thread(found_listener_t *listener, const mpi_search_t *se
         }
     }
 
+    if (search->opts.progress) {
+        print_progress(worker, iterations, wall_seconds() - shared->start);
+    }
     free(workspace);
     return iterations;
 }
@@ -161,6 +169,7 @@ int main(int argc, char **argv)
 
     found_listener_t listener;
     found_listener_start(&listener, &search);
+    shared.start = wall_seconds();
 
     uint64_t iterations = 0;
     #pragma omp parallel num_threads(threads) reduction(+ : iterations)

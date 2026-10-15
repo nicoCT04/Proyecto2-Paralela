@@ -110,10 +110,16 @@ static void run_master(const mpi_search_t *search, search_result_t *result)
  * @param  found_key   Salida: la llave, si se halló.
  * @return 1 si la halló, 0 si no.
  */
-static int search_chunk(const mpi_search_t *search, const uint64_t work[WORK_COUNT],
+static int search_chunk(const mpi_search_t *search, const uint64_t work[WORK_COUNT], double start,
                         uint64_t *iterations, uint64_t *found_key)
 {
+    if (search->opts.progress) {
+        print_chunk(search->rank, work[WORK_FIRST], MPI_Wtime() - start);
+    }
     for (uint64_t key = work[WORK_FIRST]; key < work[WORK_END]; ++key) {
+        if (search->opts.progress && (*iterations & (PROGRESS_INTERVAL - 1)) == 0) {
+            print_progress(search->rank, *iterations, MPI_Wtime() - start);
+        }
         ++*iterations;
         if (try_key(key, search->problem.cipher, search->problem.cipher_length,
                     search->problem.phrase, search->workspace)) {
@@ -143,7 +149,7 @@ static uint64_t run_worker(const mpi_search_t *search)
     uint64_t next_work[WORK_COUNT];
     MPI_Status status;
 
-    mpi_search_begin();
+    const double start = mpi_search_begin();
     MPI_Send(ask, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
     MPI_Recv(work, WORK_COUNT, MPI_UINT64_T, MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
@@ -154,7 +160,10 @@ static uint64_t run_worker(const mpi_search_t *search)
                   &next_request);
 
         uint64_t found_key;
-        if (search_chunk(search, work, &iterations, &found_key)) {
+        if (search_chunk(search, work, start, &iterations, &found_key)) {
+            if (search->opts.progress) {
+                print_progress(search->rank, iterations, MPI_Wtime() - start);
+            }
             /*
              * El aviso sale de una vez para no retrasar T_p. Como MPI no adelanta
              * mensajes del mismo origen, el maestro ya atendió el pedido adelantado
@@ -170,6 +179,9 @@ static uint64_t run_worker(const mpi_search_t *search)
         memcpy(work, next_work, sizeof(work));
     }
 
+    if (search->opts.progress) {
+        print_progress(search->rank, iterations, MPI_Wtime() - start);
+    }
     const uint64_t done[REQ_COUNT] = {STATE_DONE, 0, iterations};
     MPI_Send(done, REQ_COUNT, MPI_UINT64_T, MASTER, TAG_REQUEST, MPI_COMM_WORLD);
     return iterations;

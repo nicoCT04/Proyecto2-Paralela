@@ -29,7 +29,8 @@
 /** Opciones extra que admite cada programa (se combinan con |). */
 enum {
     OPT_OUTPUT = 1 << 0,   /**< -o: guardar el cifrado (cifrar). */
-    OPT_CHUNK  = 1 << 1    /**< -c: tamaño de chunk (ciclico, maestro_trabajador). */
+    OPT_CHUNK  = 1 << 1,   /**< -c: tamaño de chunk (ciclico, maestro_trabajador). */
+    OPT_PROGRESS = 1 << 2
 };
 
 /** Resultado de parse_options. */
@@ -49,6 +50,7 @@ typedef struct {
     int         time_limit_s; /**< Límite de la búsqueda en segundos (0 = sin límite). */
     int         chunk_bits;   /**< Tamaño de chunk: 2^chunk_bits llaves (con OPT_CHUNK). */
     const char *output_path;  /**< Archivo de salida del cifrado (puede ser NULL). */
+    int         progress;
 } program_options_t;
 
 /**
