@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fuerza bruta DES</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ee;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --hairline: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --good: #006300;
+  --critical: #d03b3b;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 4px 16px rgba(11, 11, 11, 0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --hairline: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --accent-ink: #ffffff;
+    --good: #0ca30c;
+    --critical: #e66767;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --hairline: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5;
+  --accent-ink: #ffffff;
+  --good: #0ca30c;
+  --critical: #e66767;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --shadow: none;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.mono, code, pre { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+.num { font-variant-numeric: tabular-nums; }
+
+.page { max-width: 1640px; margin: 0 auto; padding: 32px 24px 64px; }
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 24px; }
+.top h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -0.01em; }
+.top p { margin: 6px 0 0; color: var(--ink-2); max-width: 720px; }
+.machine { color: var(--muted); font-size: 13px; text-align: right; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.controls { padding: 20px; display: grid; gap: 18px; }
+.fields { display: grid; grid-template-columns: minmax(260px, 2.2fr) repeat(5, minmax(120px, 1fr)); gap: 14px; }
+.field { display: grid; gap: 6px; align-content: start; }
+.field > label, .field > .label { font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.02em; text-transform: uppercase; }
+.field .hint { font-size: 12px; color: var(--muted); }
+
+.text-input, .stepper {
+  height: 40px;
+  border: 1px solid var(--axis);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.text-input { width: 100%; padding: 0 12px; font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
+.text-input:focus, .stepper:focus-within { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.stepper { display: grid; grid-template-columns: 34px 1fr 34px; align-items: stretch; overflow: hidden; }
+.stepper input { min-width: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: center; font-variant-numeric: tabular-nums; }
+.stepper input:focus { outline: none; }
+.stepper button { border: 0; background: transparent; color: var(--ink-2); font-size: 18px; cursor: pointer; }
+.stepper button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset {
+  border: 1px solid var(--axis); background: transparent; color: var(--ink-2);
+  border-radius: 999px; padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.preset:hover { color: var(--ink); border-color: var(--ink-2); }
+
+.algos { display: flex; flex-wrap: wrap; gap: 8px; }
+.algo {
+  display: grid; gap: 2px; text-align: left; min-width: 170px; flex: 1 1 170px;
+  border: 1px solid var(--axis); border-radius: 12px; padding: 10px 12px;
+  background: transparent; color: var(--ink); font: inherit; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.algo:hover { border-color: var(--ink-2); }
+.algo:active { transform: scale(0.98); }
+.algo strong { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.algo span { font-size: 12px; color: var(--muted); }
+.algo .check {
+  width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--axis);
+  display: inline-grid; place-items: center; flex: none; transition: background 0.15s, border-color 0.15s;
+}
+.algo[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.algo[aria-pressed="true"] .check { background: var(--accent); border-color: var(--accent); }
+.algo[aria-pressed="true"] .check::after { content: ""; width: 8px; height: 4px; border: 2px solid var(--accent-ink); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.algo:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.btn {
+  height: 40px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--axis);
+  background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.btn:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.segmented { display: inline-flex; border: 1px solid var(--axis); border-radius: 10px; overflow: hidden; height: 40px; }
+.segmented button { border: 0; background: transparent; color: var(--ink-2); padding: 0 12px; font: inherit; font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.segmented button + button { border-left: 1px solid var(--axis); }
+.segmented button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--ink); font-weight: 600; }
+.message { font-size: 13px; color: var(--critical); min-height: 20px; }
+.message.info { color: var(--ink-2); }
+
+.replay { display: none; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.replay.visible { display: flex; }
+.timeline { flex: 1 1 220px; height: 6px; border-radius: 3px; background: var(--hairline); position: relative; overflow: hidden; }
+.timeline div { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: 3px; }
+.clock { font-size: 13px; color: var(--ink-2); min-width: 110px; }
+.race { flex: 1 1 100%; display: grid; gap: 8px; }
+.race-row { display: grid; grid-template-columns: minmax(120px, 170px) 1fr minmax(84px, auto); align-items: center; gap: 12px; font-size: 13px; }
+.race-row .race-name { color: var(--ink); font-weight: 600; }
+.race-bar { height: 10px; border-radius: 5px; background: var(--hairline); overflow: hidden; }
+.race-bar div { height: 100%; width: 0; border-radius: 5px; background: var(--accent); }
+.race-row.done .race-bar div { background: var(--good); }
+.race-row .race-time { text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.race-row.done .race-time { color: var(--good); font-weight: 600; }
+.race-row.lost .race-bar div { background: var(--critical); }
+
+.banner { display: none; margin-bottom: 16px; padding: 14px 18px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--critical) 40%, transparent); color: var(--ink); background: color-mix(in srgb, var(--critical) 8%, var(--surface)); }
+.banner.visible { display: block; }
+.banner code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
+
+.lanes { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 16px; margin-top: 16px; }
+.lane { padding: 18px; display: grid; gap: 10px; align-content: start; animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.lane:nth-child(2) { animation-delay: 0.05s; } .lane:nth-child(3) { animation-delay: 0.1s; }
+.lane:nth-child(4) { animation-delay: 0.15s; } .lane:nth-child(5) { animation-delay: 0.2s; }
+.lane:nth-child(6) { animation-delay: 0.25s; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px) scale(0.99); } to { opacity: 1; transform: none; } }
+.lane-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lane-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lane-title h3 { margin: 0; font-size: 17px; }
+.lane-time { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--hairline); white-space: nowrap; }
+.lane[data-state="running"] .pill { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.lane[data-state="running"] .pill::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; animation: blink 1s ease-in-out infinite; }
+.lane[data-state="found"] .pill { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.lane[data-state="error"] .pill, .lane[data-state="notfound"] .pill { color: var(--critical); }
+@keyframes blink { 50% { opacity: 0.25; } }
+.lane-desc, .lane-predict, .lane-result { margin: 0; font-size: 13px; color: var(--ink-2); }
+.lane-predict b, .lane-result b { color: var(--ink); font-weight: 600; }
+.lane-result { color: var(--ink); min-height: 20px; }
+
+.grid-wrap { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--hairline); background: var(--surface); }
+.grid-wrap canvas.grid { display: block; width: 100%; aspect-ratio: 4 / 1; image-rendering: pixelated; }
+.grid-wrap canvas.overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.axis-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: -4px; }
+.lens-title { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.lens { display: block; width: 100%; height: 34px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.legend b { color: var(--ink); font-weight: 600; }
+
+details.console { font-size: 12px; }
+details.console summary { cursor: pointer; color: var(--muted); list-style: none; }
+details.console summary::-webkit-details-marker { display: none; }
+details.console summary::before { content: "▸ "; }
+details.console[open] summary::before { content: "▾ "; }
+details.console code { display: block; margin-top: 8px; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; overflow-x: auto; white-space: pre; color: var(--ink); }
+details.console pre { margin: 6px 0 0; max-height: 220px; overflow: auto; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; color: var(--ink-2); }
+
+.summary { margin-top: 16px; padding: 18px; display: none; }
+.summary.visible { display: block; }
+.summary h2, .help h2 { margin: 0 0 4px; font-size: 17px; }
+.summary p { margin: 0 0 12px; color: var(--ink-2); font-size: 13px; }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--hairline); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+th:first-child, td:first-child { text-align: left; }
+td .tag { margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--good); }
+tr.best td { background: color-mix(in srgb, var(--good) 6%, transparent); }
+
+.help { margin-top: 16px; padding: 18px; display: grid; gap: 8px; }
+.help ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; display: grid; gap: 4px; }
+
+.tooltip {
+  position: fixed; z-index: 10; pointer-events: none; max-width: 300px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px; font-size: 12px; line-height: 1.45;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); opacity: 0; transform: translateY(4px);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.tooltip.visible { opacity: 1; transform: none; }
+.tooltip .muted { color: var(--muted); }
+
+@media (max-width: 1100px) {
+  .machine { text-align: left; }
+  .fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fields .field.wide { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .page { padding: 20px 16px 48px; }
+  .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lanes { grid-template-columns: 1fr; }
+  .algo { min-width: 140px; }
+  .machine { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lane { animation: none; }
+  .lane[data-state="running"] .pill::before { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div>
+      <h1>Fuerza bruta DES</h1>
+      <p>Corre los programas del proyecto con <span class="mono">mpirun</span>, uno tras otro y con la máquina libre, y muestra qué llaves prueba cada proceso. Al final los repite juntos con el mismo reloj.</p>
+    </div>
+    <div class="machine" id="machine"></div>
+  </header>
+
+  <div class="banner" id="banner">
+    No hay conexión con el servidor local. Desde la carpeta del proyecto corre <code>make</code> y luego <code>python3 visualizer/server.py</code>, y abre <code>http://127.0.0.1:8765</code>.
+  </div>
+
+  <section class="card controls" aria-label="Parámetros">
+    <div class="fields">
+      <div class="field wide">
+        <label for="key">Llave privada (-k)</label>
+        <input id="key" class="text-input" inputmode="numeric" autocomplete="off" spellcheck="false" value="60000000">
+        <div class="presets" id="presets">
+          <button class="preset" data-preset="a" type="button">a</button>
+          <button class="preset" data-preset="b" type="button">b</button>
+          <button class="preset" data-preset="c" type="button">c</button>
+          <button class="preset" data-preset="facil" type="button">fácil</button>
+          <button class="preset" data-preset="media" type="button">media</button>
+          <button class="preset" data-preset="dificil" type="button">difícil</button>
+          <button class="preset" data-preset="random" type="button">al azar</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="bits">Bits (-b)</label>
+        <div class="stepper"><button type="button" data-step="-1" aria-label="Menos">−</button><input id="bits" inputmode="numeric" value="26" data-min="8" data-max="56"><button type="button" data-step="1" aria-label="Más">+</button></div>
+        <span class="hint num" id="space-hint"></span>
+      </div>
+      <div class="field">
+        <label for="processes">Procesos (-np)</label>
+        <div class="stepper"><button type="button" data-step="-1" aria-label="Menos">−</button><input id="processes" inputmode="numeric" value="4" data-min="1" data-max="8"><button type="button" data-step="1" aria-label="Más">+</button></div>
+        <span class="hint">Todos menos el secuencial</span>
+      </div>
+      <div class="field">
+        <label for="threads">Hilos del híbrido</label>
+        <div class="stepper"><button type="button" data-step="-1" aria-label="Menos">−</button><input id="threads" inputmode="numeric" value="2" data-min="1" data-max="4"><button type="button" data-step="1" aria-label="Más">+</button></div>
+        <span class="hint">OMP_NUM_THREADS</span>
+      </div>
+      <div class="field">
+        <label for="chunk">Chunk (-c bits)</label>
+        <div class="stepper"><button type="button" data-step="-1" aria-label="Menos">−</button><input id="chunk" inputmode="numeric" value="16" data-min="8" data-max="30"><button type="button" data-step="1" aria-label="Más">+</button></div>
+        <span class="hint">Cíclico y maestro-trabajador</span>
+      </div>
+      <div class="field">
+        <label for="limit">Límite (-t s)</label>
+        <div class="stepper"><button type="button" data-step="-10" aria-label="Menos">−</button><input id="limit" inputmode="numeric" value="120" data-min="1" data-max="3600"><button type="button" data-step="10" aria-label="Más">+</button></div>
+        <span class="hint">Por programa</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="label">Algoritmos</span>
+      <div class="algos" id="algos"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="run" type="button">Ejecutar</button>
+      <button class="btn" id="stop" type="button" disabled>Detener</button>
+      <span class="message" id="message" role="status"></span>
+    </div>
+
+    <div class="replay" id="replay">
+      <button class="btn" id="replay-btn" type="button">Repetir juntos</button>
+      <div class="segmented" id="speed" role="group" aria-label="Velocidad">
+        <button type="button" data-speed="0.5" aria-pressed="false">×0.5</button>
+        <button type="button" data-speed="1" aria-pressed="true">×1</button>
+        <button type="button" data-speed="2" aria-pressed="false">×2</button>
+        <button type="button" data-speed="4" aria-pressed="false">×4</button>
+      </div>
+      <div class="timeline"><div id="timeline-fill"></div></div>
+      <span class="clock num" id="clock">t = 0.00 s</span>
+      <div class="race" id="race"></div>
+    </div>
+  </section>
+
+  <section class="lanes" id="lanes" aria-live="polite"></section>
+
+  <section class="card summary" id="summary">
+    <h2>Comparación</h2>
+    <p id="summary-note"></p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Programa</th><th>Buscan</th><th>Tiempo</th><th>La halló</th><th>Intentos de ese proceso</th>
+            <th>Llaves probadas</th><th>Llaves/s por trabajador</th><th>Speedup</th><th>Speedup por intentos</th>
+          </tr>
+        </thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card help">
+    <h2>Cómo leer cada rectángulo</h2>
+    <ul>
+      <li>El rectángulo es todo el espacio de llaves, leído como un texto: de la llave 0 (arriba a la izquierda) a la 2<sup>b</sup> − 1 (abajo a la derecha). Cada píxel agrupa varias llaves seguidas.</li>
+      <li>El color dice qué proceso es dueño de esas llaves: tenue si todavía no las prueba, intenso si ya las probó. El círculo marca la llave buscada y los puntos, por dónde va cada proceso.</li>
+      <li>Donde el reparto es más fino que un píxel (intercalado, híbrido) el rectángulo se ve rayado: cada raya es un proceso distinto. La lupa de abajo muestra las llaves una por una alrededor de la llave buscada.</li>
+      <li>En el maestro-trabajador el proceso 0 no prueba llaves: reparte chunks a pedido, y cada chunk se pinta del trabajador que lo tomó.</li>
+      <li>El speedup por intentos es (k + 1) entre los intentos del proceso que la halló: lo que acelera el reparto sin contar el hardware. Si pasa de p, es por dónde cae la llave, no por el paralelismo.</li>
+      <li>El navegador también usa CPU mientras dibuja: para los tiempos del informe, la medición oficial sigue siendo la de la terminal (<span class="mono">scripts/campana.sh</span>).</li>
+    </ul>
+  </section>
+</div>
+<div class="tooltip" id="tooltip" role="tooltip"></div>
+
+<script>
+"use strict";
+
+const ALGORITHMS = [
+  { id: "secuencial", name: "Secuencial", desc: "Un proceso prueba 0, 1, 2, … en orden." },
+  { id: "naive", name: "Naive", desc: "El espacio se parte en p bloques contiguos, uno por proceso." },
+  { id: "intercalado", name: "Intercalado", desc: "Las llaves se reparten como cartas: el proceso r prueba r, r + p, r + 2p, …" },
+  { id: "ciclico", name: "Cíclico", desc: "Chunks de 2^c llaves repartidos como cartas entre los p procesos." },
+  { id: "maestro_trabajador", name: "Maestro-trabajador", desc: "El proceso 0 reparte chunks a pedido; los otros p − 1 buscan." },
+  { id: "hibrido", name: "Híbrido", desc: "El intercalado con p procesos × T hilos de OpenMP." },
+];
+const DEFAULT_SELECTION = new Set(["secuencial", "naive", "intercalado", "ciclico", "maestro_trabajador", "hibrido"]);
+const GRID_W = 512;
+const GRID_CELLS = 65536;
+const LENS_KEYS = 32;
+const STRIPE = 3;
+const LIVE_FRAME_MS = 66;
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+const group = (value) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+const fmtInt = (value) => group(typeof value === "bigint" ? value : Math.round(value));
+const fmtSeconds = (s) => `${s.toFixed(s < 10 ? 2 : 1)} s`;
+const fmtRate = (r) => r >= 1e6 ? `${(r / 1e6).toFixed(2)} M` : r >= 1e3 ? `${(r / 1e3).toFixed(1)} k` : r.toFixed(0);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+const state = {
+  available: new Set(ALGORITHMS.map((a) => a.id)),
+  selected: new Set(DEFAULT_SELECTION),
+  lanes: [],
+  config: null,
+  running: false,
+  stopRequested: false,
+  controller: null,
+  palette: null,
+  replay: null,
+  speed: 1,
+};
+
+function hexToRgb(hex) {
+  const h = hex.trim().replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function mix(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+function rgbCss(c) {
+  return `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`;
+}
+function luminance(c) {
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+}
+
+function readPalette() {
+  const css = getComputedStyle(document.documentElement);
+  const get = (name) => hexToRgb(css.getPropertyValue(name));
+  return {
+    series: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => get(`--s${i}`)),
+    surface: get("--surface"),
+    ink: get("--ink"),
+    muted: get("--muted"),
+    hairline: get("--hairline"),
+    dark: luminance(get("--surface")) < 0.2,
+  };
+}
+
+function makeModel(id, cfg) {
+  const p = cfg.processes;
+  const T = cfg.threads;
+  const bitsB = BigInt(cfg.bits);
+  const Nb = 1n << bitsB;
+  const Nn = 2 ** cfg.bits;
+  const Cb = 1n << BigInt(cfg.chunk);
+  const Cn = 2 ** cfg.chunk;
+  const pB = BigInt(p);
+  const procLabel = (w) => `P${w}`;
+  const base = { p, T, Nb, Nn, Cb, Cn };
+
+  if (id === "secuencial") {
+    return {
+      ...base, workers: 1, searchers: [0], searching: 1,
+      color: () => ({ slot: 0, shade: 0 }), label: procLabel, short: () => "0",
+      mixing: () => 1,
+      sample(a, s, x, y, o) { o.w = 0; o.pos = a; o.span = s; return true; },
+      exact(k) { return { w: 0, pos: k }; },
+      predict() { return { w: 0, it: cfg.key + 1n }; },
+      front(w, it) { return it < Nn ? it : null; },
+    };
+  }
+  if (id === "naive") {
+    const Bb = Nb / pB;
+    const Bn = Number(Bb);
+    const ownerOf = (k) => { const r = k / Bb; return r > pB - 1n ? pB - 1n : r; };
+    return {
+      ...base, workers: p, searchers: [...Array(p).keys()], searching: p,
+      color: (w) => ({ slot: w, shade: 0 }), label: procLabel, short: (w) => String(w),
+      mixing: () => 1,
+      sample(a, s, x, y, o) {
+        const r = Math.min(Math.floor(a / Bn), p - 1);
+        o.w = r; o.pos = a - r * Bn; o.span = s; return true;
+      },
+      exact(k) { const r = ownerOf(k); return { w: Number(r), pos: k - r * Bb }; },
+      predict() { const r = ownerOf(cfg.key); return { w: Number(r), it: cfg.key - r * Bb + 1n }; },
+      front(w, it) {
+        const size = w === p - 1 ? Nn - (p - 1) * Bn : Bn;
+        return it < size ? w * Bn + it : null;
+      },
+    };
+  }
+  if (id === "intercalado" || id === "hibrido") {
+    const hybrid = id === "hibrido";
+    const w = hybrid ? p * T : p;
+    const wB = BigInt(w);
+    return {
+      ...base, workers: w, searchers: [...Array(w).keys()], searching: w,
+      color: (g) => hybrid ? { slot: Math.floor(g / T), shade: g % T } : { slot: g, shade: 0 },
+      label: (g) => hybrid ? `P${Math.floor(g / T)}·h${g % T}` : `P${g}`,
+      short: (g) => hybrid ? String(Math.floor(g / T)) : String(g),
+      mixing: (s) => Math.min(s, w),
+      sMod: null,
+      sample(a, s, x, y, o) {
+        const m = Math.min(s, w);
+        const c = a / s;
+        if (this.sMod === null || this.sModFor !== s) { this.sMod = Number(BigInt(s) % wB); this.sModFor = s; }
+        const aMod = ((c % w) * this.sMod) % w;
+        const j = Math.floor((x + y) / STRIPE) % m;
+        o.w = (aMod + j) % w;
+        o.pos = Math.floor((a + j) / w);
+        o.span = Math.max(1, s / w);
+        return true;
+      },
+      exact(k) { return { w: Number(k % wB), pos: k / wB }; },
+      predict() { return { w: Number(cfg.key % wB), it: cfg.key / wB + 1n }; },
+      front(g, it) { const k = g + it * w; return k < Nn ? k : null; },
+    };
+  }
+  if (id === "ciclico") {
+    const chunks = Nn / Cn;
+    return {
+      ...base, workers: p, searchers: [...Array(p).keys()], searching: Math.min(p, chunks),
+      color: (w) => ({ slot: w, shade: 0 }), label: procLabel, short: (w) => String(w),
+      mixing: (s) => Cn >= s ? 1 : Math.min(s / Cn, p),
+      sample(a, s, x, y, o) {
+        if (Cn >= s) {
+          const j = Math.floor(a / Cn);
+          o.w = j % p; o.pos = Math.floor(j / p) * Cn + (a % Cn); o.span = s;
+        } else {
+          const j = a / Cn + (Math.floor((x + y) / STRIPE) % Math.min(s / Cn, p));
+          o.w = j % p; o.pos = Math.floor(j / p) * Cn; o.span = Cn;
+        }
+        return true;
+      },
+      exact(k) { const j = k / Cb; return { w: Number(j % pB), pos: (j / pB) * Cb + k % Cb }; },
+      predict() { const j = cfg.key / Cb; return { w: Number(j % pB), it: (j / pB) * Cb + cfg.key % Cb + 1n }; },
+      front(w, it) {
+        const j = w + Math.floor(it / Cn) * p;
+        return j < chunks ? j * Cn + (it % Cn) : null;
+      },
+    };
+  }
+  if (id === "maestro_trabajador") {
+    const W = Math.max(1, p - 1);
+    return {
+      ...base, workers: p, searchers: [...Array(p).keys()].slice(1), searching: W, dynamic: true,
+      color: (w) => ({ slot: w, shade: 0 }),
+      label: (w) => w === 0 ? "P0 (maestro)" : `P${w}`, short: (w) => String(w),
+      mixing: (s) => Cn >= s ? 1 : Math.min(s / Cn, 16),
+      sample(a, s, x, y, o, view) {
+        let j, offset;
+        if (Cn >= s) { j = Math.floor(a / Cn); offset = a % Cn; o.span = s; }
+        else { j = a / Cn + (Math.floor((x + y) / STRIPE) % Math.min(s / Cn, 16)); offset = 0; o.span = Cn; }
+        const info = view.chunkMap.get(j);
+        if (!info) return false;
+        o.w = info.w; o.pos = info.order * Cn + offset;
+        return true;
+      },
+      exact(k, view) {
+        const info = view.chunkMap.get(Number(k / Cb));
+        return info ? { w: info.w, pos: BigInt(info.order) * Cb + k % Cb } : null;
+      },
+      predict() {
+        const j = cfg.key / Cb;
+        return { w: -1, it: (j / BigInt(W)) * Cb + cfg.key % Cb + 1n, approx: true };
+      },
+      front(w, it, view) {
+        const list = view.workerChunks[w];
+        if (!list) return null;
+        const order = Math.floor(it / Cn);
+        if (order >= list.length) return null;
+        return list[order] * Cn + (it % Cn);
+      },
+    };
+  }
+  throw new Error(`Algoritmo desconocido: ${id}`);
+}
+
+function emptyView(model) {
+  return {
+    iters: new Float64Array(model.workers),
+    chunkMap: new Map(),
+    workerChunks: Array.from({ length: model.workers }, () => []),
+    finished: false,
+  };
+}
+
+function addChunk(view, model, w, keyText) {
+  const j = Number(BigInt(keyText) / model.Cb);
+  if (view.chunkMap.has(j)) return;
+  view.chunkMap.set(j, { w, order: view.workerChunks[w].length });
+  view.workerChunks[w].push(j);
+}
+
+class Lane {
+  constructor(algo, cfg) {
+    this.algo = algo;
+    this.cfg = cfg;
+    this.model = makeModel(algo.id, cfg);
+    this.view = emptyView(this.model);
+    this.events = [];
+    this.result = null;
+    this.status = "waiting";
+    this.lastS = 0;
+    this.lastArrival = 0;
+    this.dirty = true;
+    const cells = Math.min(this.model.Nn, GRID_CELLS);
+    this.grid = { W: Math.min(cells, GRID_W), H: cells / Math.min(cells, GRID_W), s: this.model.Nn / cells };
+    this.lensCount = Math.min(this.model.Nn, LENS_KEYS);
+    this.lensStart = (() => {
+      const half = BigInt(Math.floor(this.lensCount / 2) - 1);
+      let start = cfg.key > half ? cfg.key - half : 0n;
+      const maxStart = this.model.Nb - BigInt(this.lensCount);
+      return start > maxStart ? maxStart : start;
+    })();
+    this.build();
+    this.applyPalette();
+  }
+
+  build() {
+    const root = el("article", "card lane");
+    root.dataset.state = this.status;
+    const head = el("header", "lane-head");
+    const title = el("div", "lane-title");
+    title.append(el("h3", "", this.algo.name));
+    this.pill = el("span", "pill", "En espera");
+    title.append(this.pill);
+    this.timeEl = el("div", "lane-time num", "—");
+    head.append(title, this.timeEl);
+
+    const desc = el("p", "lane-desc", this.describe());
+    const predict = el("p", "lane-predict");
+    predict.innerHTML = this.predictionHtml();
+    this.resultEl = el("p", "lane-result");
+
+    const wrap = el("div", "grid-wrap");
+    this.canvas = el("canvas", "grid");
+    this.canvas.width = this.grid.W;
+    this.canvas.height = this.grid.H;
+    this.overlay = el("canvas", "overlay");
+    wrap.append(this.canvas, this.overlay);
+    this.ctx = this.canvas.getContext("2d");
+    this.image = this.ctx.createImageData(this.grid.W, this.grid.H);
+    const axis = el("div", "axis-row num");
+    axis.append(el("span", "", "0"), el("span", "", `${fmtInt(this.model.Nb - 1n)}  (2^${this.cfg.bits} − 1)`));
+
+    const lensTitle = el("div", "lens-title");
+    lensTitle.append(el("span", "", `Lupa: ${this.lensCount} llaves alrededor de la llave buscada`), el("span", "num", `${fmtInt(this.lensStart)} – ${fmtInt(this.lensStart + BigInt(this.lensCount) - 1n)}`));
+    this.lens = el("canvas", "lens");
+
+    this.legend = el("div", "legend");
+    const consoleBox = el("details", "console");
+    consoleBox.append(el("summary", "", "Comando y salida del programa"));
+    this.cmdEl = el("code", "", "Todavía no se ejecuta.");
+    this.logEl = el("pre", "", "");
+    consoleBox.append(this.cmdEl, this.logEl);
+
+    root.append(head, desc, predict, this.resultEl, wrap, axis, lensTitle, this.lens, this.legend, consoleBox);
+    this.root = root;
+
+    this.canvas.addEventListener("mousemove", (e) => this.hoverGrid(e));
+    this.canvas.addEventListener("mouseleave", hideTooltip);
+    this.lens.addEventListener("mousemove", (e) => this.hoverLens(e));
+    this.lens.addEventListener("mouseleave", hideTooltip);
+    new ResizeObserver(() => { this.dirty = true; scheduleRender(); }).observe(wrap);
+  }
+
+  describe() {
+    const { p, T, Cn } = this.model;
+    const d = this.algo.desc.replace("2^c", `2^${this.cfg.chunk} = ${fmtInt(Cn)}`);
+    if (this.algo.id === "secuencial") return d;
+    if (this.algo.id === "hibrido") return `${d} Aquí: ${p} × ${T} = ${p * T} trabajadores.`;
+    if (this.algo.id === "maestro_trabajador") return `${d} Aquí buscan ${Math.max(1, p - 1)} de ${p}.`;
+    return `${d} Aquí: p = ${p}.`;
+  }
+
+  predictionHtml() {
+    const pr = this.model.predict();
+    const who = pr.w < 0 ? "algún trabajador" : this.model.label(pr.w);
+    const speed = Number(this.cfg.key + 1n) / Number(pr.it);
+    const approx = pr.approx ? "≈ " : "";
+    return `Predicción por fórmula: la halla <b>${who}</b> tras <b class="num">${approx}${fmtInt(pr.it)}</b> intentos propios · speedup por intentos <b class="num">${approx}${speed.toFixed(2)}</b>`;
+  }
+
+  applyPalette() {
+    const pal = state.palette;
+    this.colors = [];
+    for (let w = 0; w < this.model.workers; w++) {
+      const { slot, shade } = this.model.color(w);
+      const T = this.algo.id === "hibrido" ? this.model.T : 1;
+      const step = T > 1 ? (shade / (T - 1)) * 0.38 : 0;
+      const tested = mix(pal.series[slot % 8], pal.ink, step);
+      const untested = mix(tested, pal.surface, pal.dark ? 0.72 : 0.8);
+      this.colors.push({ tested, untested });
+    }
+    this.neutral = mix(pal.muted, pal.surface, pal.dark ? 0.8 : 0.86);
+    this.renderLegend();
+    this.dirty = true;
+  }
+
+  renderLegend() {
+    this.legend.textContent = "";
+    this.legendCounts = [];
+    for (let w = 0; w < this.model.workers; w++) {
+      const item = el("span");
+      const swatch = el("i");
+      swatch.style.background = rgbCss(this.colors[w].tested);
+      const count = el("b", "num", "0");
+      const isMaster = this.algo.id === "maestro_trabajador" && w === 0;
+      item.append(swatch, document.createTextNode(`${this.model.label(w)} `), isMaster ? el("span", "", "· reparte, no busca") : count);
+      if (isMaster) swatch.style.background = rgbCss(this.neutral);
+      this.legend.append(item);
+      this.legendCounts.push(isMaster ? null : count);
+    }
+  }
+
+  setStatus(status, text) {
+    this.status = status;
+    this.root.dataset.state = status;
+    this.pill.textContent = text;
+  }
+
+  handle(evt) {
+    if (evt.t === "start") {
+      this.cmdEl.textContent = evt.command;
+      this.logEl.textContent = "";
+      return;
+    }
+    if (evt.t === "p") {
+      if (evt.w < this.model.workers) {
+        this.view.iters[evt.w] = Math.max(this.view.iters[evt.w], evt.i);
+        this.events.push(evt);
+        this.lastS = Math.max(this.lastS, evt.s);
+        this.lastArrival = performance.now();
+        this.dirty = true;
+      }
+      return;
+    }
+    if (evt.t === "c") {
+      if (evt.w < this.model.workers) {
+        addChunk(this.view, this.model, evt.w, evt.k);
+        this.events.push(evt);
+        this.lastS = Math.max(this.lastS, evt.s);
+        this.dirty = true;
+      }
+      return;
+    }
+    if (evt.t === "r") {
+      this.result = evt;
+      this.appendLog(evt.csv);
+      return;
+    }
+    if (evt.t === "l") {
+      this.appendLog(evt.text);
+      return;
+    }
+  }
+
+  appendLog(text) {
+    this.logEl.textContent += `${text}\n`;
+  }
+
+  finish(code) {
+    this.view.finished = true;
+    if (this.result) {
+      const r = this.result;
+      if (r.found === "NA") {
+        this.setStatus("notfound", "Sin hallar");
+        this.resultEl.innerHTML = `No la halló dentro del límite de <b>${this.cfg.limit} s</b> (${fmtInt(r.total)} llaves probadas).`;
+      } else {
+        this.setStatus("found", "Encontrada");
+        const finder = this.finderLabel();
+        const mismatch = r.found !== String(this.cfg.key) ? " · <b>ojo: no es la llave real (falso positivo)</b>" : "";
+        this.resultEl.innerHTML = `La halló <b>${finder}</b> en <b class="num">${fmtSeconds(r.time)}</b> tras <b class="num">${fmtInt(r.iterations)}</b> intentos propios · ${fmtInt(r.total)} llaves probadas en total${mismatch}`;
+      }
+      this.timeEl.textContent = fmtSeconds(r.time);
+      this.finalTime = r.time;
+    } else if (state.stopRequested) {
+      this.setStatus("stopped", "Detenida");
+      this.finalTime = this.lastS;
+    } else {
+      this.setStatus("error", "Error");
+      this.resultEl.textContent = `El programa terminó sin resultado (código ${code}). Revisa la salida abajo.`;
+      this.finalTime = this.lastS;
+    }
+    this.dirty = true;
+  }
+
+  finderLabel() {
+    const r = this.result;
+    if (!r || r.finder < 0) return "—";
+    if (this.algo.id === "hibrido") {
+      const keyB = BigInt(r.found);
+      const g = Number(keyB % BigInt(this.model.workers));
+      return this.model.label(g);
+    }
+    return this.model.label(r.finder);
+  }
+
+  finderWorker() {
+    const r = this.result;
+    if (!r || r.found === "NA" || r.finder < 0) return -1;
+    if (this.algo.id === "hibrido") return Number(BigInt(r.found) % BigInt(this.model.workers));
+    return r.finder;
+  }
+
+  liveTime() {
+    if (this.status === "running" && this.lastArrival) {
+      return this.lastS + Math.min(0.25, (performance.now() - this.lastArrival) / 1000);
+    }
+    return this.lastS;
+  }
+
+  render(view = this.view, found = view.finished && this.status === "found") {
+    this.paintGrid(view);
+    this.paintOverlay(view, found);
+    this.paintLens(view, found);
+    for (let w = 0; w < this.model.workers; w++) {
+      if (this.legendCounts[w]) this.legendCounts[w].textContent = fmtInt(view.iters[w]);
+    }
+    this.dirty = false;
+    this.lastPaint = performance.now();
+  }
+
+  paintGrid(view) {
+    const { W, H, s } = this.grid;
+    const data = this.image.data;
+    const model = this.model;
+    const iters = view.iters;
+    const colors = this.colors;
+    const neutral = this.neutral;
+    const o = { w: 0, pos: 0, span: 1 };
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const c = y * W + x;
+        const a = c * s;
+        const idx = c * 4;
+        if (model.sample(a, s, x, y, o, view)) {
+          const f = clamp((iters[o.w] - o.pos) / o.span, 0, 1);
+          const col = colors[o.w];
+          data[idx] = col.untested[0] + (col.tested[0] - col.untested[0]) * f;
+          data[idx + 1] = col.untested[1] + (col.tested[1] - col.untested[1]) * f;
+          data[idx + 2] = col.untested[2] + (col.tested[2] - col.untested[2]) * f;
+        } else {
+          data[idx] = neutral[0];
+          data[idx + 1] = neutral[1];
+          data[idx + 2] = neutral[2];
+        }
+        data[idx + 3] = 255;
+      }
+    }
+    this.ctx.putImageData(this.image, 0, 0);
+  }
+
+  cellCenter(key, cw, ch) {
+    const { W, H, s } = this.grid;
+    const c = Math.floor(key / s);
+    return [((c % W) + 0.5) * (cw / W), (Math.floor(c / W) + 0.5) * (ch / H)];
+  }
+
+  paintOverlay(view, found) {
+    const dpr = window.devicePixelRatio || 1;
+    const cw = this.overlay.clientWidth;
+    const ch = this.overlay.clientHeight;
+    if (!cw || !ch) return;
+    if (this.overlay.width !== Math.round(cw * dpr) || this.overlay.height !== Math.round(ch * dpr)) {
+      this.overlay.width = Math.round(cw * dpr);
+      this.overlay.height = Math.round(ch * dpr);
+    }
+    const ctx = this.overlay.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    const pal = state.palette;
+
+    if (!view.finished) {
+      for (const w of this.model.searchers) {
+        const key = this.model.front(w, view.iters[w], view);
+        if (key === null || key === undefined) continue;
+        const [x, y] = this.cellCenter(key, cw, ch);
+        ctx.beginPath();
+        ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = rgbCss(this.colors[w].tested);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = rgbCss(pal.surface);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    const [tx, ty] = this.cellCenter(Number(this.cfg.key), cw, ch);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = rgbCss(pal.surface);
+    ctx.beginPath();
+    ctx.arc(tx, ty, 9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = rgbCss(pal.ink);
+    ctx.beginPath();
+    ctx.arc(tx, ty, 9, 0, Math.PI * 2);
+    ctx.stroke();
+    if (found) {
+      const fw = this.finderWorker();
+      ctx.fillStyle = fw >= 0 ? rgbCss(this.colors[fw].tested) : rgbCss(pal.ink);
+      ctx.beginPath();
+      ctx.arc(tx, ty, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = rgbCss(pal.surface);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(tx - 3.5, ty + 0.2);
+      ctx.lineTo(tx - 1, ty + 2.8);
+      ctx.lineTo(tx + 3.8, ty - 2.6);
+      ctx.stroke();
+    }
+  }
+
+  lensKeyState(i, view) {
+    const k = this.lensStart + BigInt(i);
+    const info = this.model.exact(k, view);
+    if (!info) return { k, w: -1, tested: false };
+    const done = BigInt(Math.floor(view.iters[info.w]));
+    return { k, w: info.w, pos: info.pos, tested: done > info.pos };
+  }
+
+  paintLens(view, found) {
+    const dpr = window.devicePixelRatio || 1;
+    const cw = this.lens.clientWidth;
+    const ch = this.lens.clientHeight;
+    if (!cw || !ch) return;
+    if (this.lens.width !== Math.round(cw * dpr) || this.lens.height !== Math.round(ch * dpr)) {
+      this.lens.width = Math.round(cw * dpr);
+      this.lens.height = Math.round(ch * dpr);
+    }
+    const ctx = this.lens.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    const pal = state.palette;
+    const n = this.lensCount;
+    const gap = n > 32 ? 2 : 3;
+    const bw = (cw - gap * (n - 1)) / n;
+    const top = 4;
+    const bh = ch - 8;
+    ctx.font = `600 ${bw < 11 ? 9 : 10}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < n; i++) {
+      const st = this.lensKeyState(i, view);
+      const x = i * (bw + gap);
+      const isTarget = st.k === this.cfg.key;
+      let fill;
+      if (st.w < 0) fill = this.neutral;
+      else fill = st.tested ? this.colors[st.w].tested : this.colors[st.w].untested;
+      ctx.fillStyle = rgbCss(fill);
+      roundRect(ctx, x, top, bw, bh, Math.min(4, bw / 3));
+      ctx.fill();
+      if (st.w >= 0 && bw >= 8) {
+        ctx.fillStyle = luminance(fill) > 0.45 ? "#0b0b0b" : "#ffffff";
+        ctx.fillText(this.model.short(st.w), x + bw / 2, top + bh / 2 + 0.5);
+      }
+      if (isTarget) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = rgbCss(pal.ink);
+        roundRect(ctx, x - 1.5, top - 2.5, bw + 3, bh + 5, 5);
+        ctx.stroke();
+      }
+    }
+  }
+
+  hoverGrid(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const { W, H, s } = this.grid;
+    const x = clamp(Math.floor(((e.clientX - rect.left) / rect.width) * W), 0, W - 1);
+    const y = clamp(Math.floor(((e.clientY - rect.top) / rect.height) * H), 0, H - 1);
+    const c = BigInt(y * W + x);
+    const sB = BigInt(s);
+    const first = c * sB;
+    const last = first + sB - 1n;
+    const view = state.replay && state.replay.active ? state.replay.views.get(this) : this.view;
+    const m = this.model.mixing(s);
+    const owners = new Map();
+    const o = { w: 0, pos: 0, span: 1 };
+    for (let j = 0; j < m; j++) {
+      if (this.model.sample(Number(first), s, j * STRIPE, 0, o, view)) {
+        owners.set(o.w, clamp((view.iters[o.w] - o.pos) / o.span, 0, 1));
+      }
+    }
+    let html = s > 1 ? `<b class="num">Llaves ${fmtInt(first)} – ${fmtInt(last)}</b>` : `<b class="num">Llave ${fmtInt(first)}</b>`;
+    if (owners.size === 0) {
+      html += `<br><span class="muted">Chunk todavía sin asignar</span>`;
+    } else {
+      const fractions = [...owners.values()];
+      const avg = fractions.reduce((a, b) => a + b, 0) / fractions.length;
+      const names = [...owners.keys()].map((w) => this.model.label(w)).join(", ");
+      const prefix = owners.size > 1 ? `Intercaladas entre ${names}` : `Dueño: ${names}`;
+      html += `<br>${prefix}<br><span class="muted">Probadas: ${Math.round(avg * 100)} %</span>`;
+    }
+    if (this.cfg.key >= first && this.cfg.key <= last) html += `<br><b>Aquí está la llave buscada</b>`;
+    showTooltip(e, html);
+  }
+
+  hoverLens(e) {
+    const rect = this.lens.getBoundingClientRect();
+    const i = clamp(Math.floor(((e.clientX - rect.left) / rect.width) * this.lensCount), 0, this.lensCount - 1);
+    const view = state.replay && state.replay.active ? state.replay.views.get(this) : this.view;
+    const st = this.lensKeyState(i, view);
+    let html = `<b class="num">Llave ${fmtInt(st.k)}</b>`;
+    if (st.k === this.cfg.key) html += ` · la buscada`;
+    if (st.w < 0) html += `<br><span class="muted">Su chunk todavía no se asigna</span>`;
+    else html += `<br>${this.model.label(st.w)} · su intento n.º <span class="num">${fmtInt(st.pos + 1n)}</span><br><span class="muted">${st.tested ? "Ya probada" : "Sin probar"}</span>`;
+    showTooltip(e, html);
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+const tooltip = $("#tooltip");
+function showTooltip(e, html) {
+  tooltip.innerHTML = html;
+  tooltip.classList.add("visible");
+  const pad = 14;
+  const box = tooltip.getBoundingClientRect();
+  let left = e.clientX + pad;
+  let top = e.clientY + pad;
+  if (left + box.width > window.innerWidth - 8) left = e.clientX - box.width - pad;
+  if (top + box.height > window.innerHeight - 8) top = e.clientY - box.height - pad;
+  tooltip.style.left = `${Math.max(8, left)}px`;
+  tooltip.style.top = `${Math.max(8, top)}px`;
+}
+function hideTooltip() { tooltip.classList.remove("visible"); }
+
+let renderQueued = false;
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    if (state.replay && state.replay.active) return;
+    const now = performance.now();
+    for (const lane of state.lanes) {
+      if (lane.dirty && (lane.status !== "running" || now - (lane.lastPaint || 0) >= LIVE_FRAME_MS)) lane.render();
+      if (lane.status === "running") lane.timeEl.textContent = fmtSeconds(lane.liveTime());
+    }
+    if (state.lanes.some((l) => l.status === "running")) scheduleRender();
+  });
+}
+
+function readNumber(id) {
+  const input = $(`#${id}`);
+  const text = input.value.trim();
+  const min = Number(input.dataset.min);
+  const max = Number(input.dataset.max);
+  if (!/^\d+$/.test(text)) throw new Error(`«${input.closest(".field").querySelector("label").textContent}» debe ser un entero.`);
+  const value = Number(text);
+  if (value < min || value > max) throw new Error(`«${input.closest(".field").querySelector("label").textContent}» debe estar entre ${min} y ${max}.`);
+  return value;
+}
+
+function readConfig() {
+  const bits = readNumber("bits");
+  const processes = readNumber("processes");
+  const threads = readNumber("threads");
+  const chunk = readNumber("chunk");
+  const limit = readNumber("limit");
+  const keyText = $("#key").value.trim().replace(/[\s _.,]/g, "");
+  if (!/^\d+$/.test(keyText)) throw new Error("La llave debe ser un número entero no negativo.");
+  const key = BigInt(keyText);
+  if (key >= 1n << BigInt(bits)) throw new Error(`La llave no cabe en 2^${bits} llaves (máximo ${fmtInt((1n << BigInt(bits)) - 1n)}).`);
+  const chosen = ALGORITHMS.filter((a) => state.selected.has(a.id) && state.available.has(a.id));
+  if (chosen.length === 0) throw new Error("Elige al menos un algoritmo.");
+  if (chosen.some((a) => a.id === "ciclico" || a.id === "maestro_trabajador") && chunk >= bits) {
+    throw new Error("El chunk (-c) debe ser menor que los bits (-b).");
+  }
+  if (chosen.some((a) => a.id === "maestro_trabajador") && processes < 2) {
+    throw new Error("El maestro-trabajador necesita al menos 2 procesos.");
+  }
+  return { bits, key, processes, threads, chunk, limit, chosen };
+}
+
+function presetKey(name, bits) {
+  const N = 1n << BigInt(bits);
+  switch (name) {
+    case "a": return 123456n < N ? 123456n : N - 1n;
+    case "b": return N / 4n - 1n;
+    case "c": return N / 4n;
+    case "facil": return N / 2n + 1n;
+    case "media": return N / 2n + N / 8n;
+    case "dificil": return (20n * N + 90n) / 91n;
+    default: {
+      const words = crypto.getRandomValues(new Uint32Array(2));
+      const raw = (BigInt(words[0]) << 32n) | BigInt(words[1]);
+      return raw % N;
+    }
+  }
+}
+
+function setMessage(text, info = false) {
+  const m = $("#message");
+  m.textContent = text;
+  m.classList.toggle("info", info);
+}
+
+function updateSpaceHint() {
+  const input = $("#bits");
+  if (/^\d+$/.test(input.value) && Number(input.value) >= 8 && Number(input.value) <= 56) {
+    $("#space-hint").textContent = `${fmtInt(1n << BigInt(input.value))} llaves`;
+  } else {
+    $("#space-hint").textContent = "";
+  }
+}
+
+function setBusy(busy) {
+  state.running = busy;
+  $("#run").disabled = busy;
+  $("#stop").disabled = !busy;
+  for (const node of document.querySelectorAll(".controls input, .controls .stepper button, .preset, .algo, #replay-btn")) {
+    if (node.classList.contains("algo") && !state.available.has(node.dataset.id)) continue;
+    node.disabled = busy;
+  }
+}
+
+async function runLane(lane) {
+  lane.setStatus("running", "Corriendo");
+  lane.root.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  state.controller = new AbortController();
+  const cfg = lane.cfg;
+  const body = {
+    program: lane.algo.id, key: cfg.key.toString(), bits: cfg.bits, processes: cfg.processes,
+    threads: cfg.threads, chunk: cfg.chunk, limit: cfg.limit,
+  };
+  let exitCode = null;
+  try {
+    const response = await fetch("/api/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: state.controller.signal,
+    });
+    if (!response.ok) {
+      let text = `HTTP ${response.status}`;
+      try { text = (await response.json()).error || text; } catch (_) {}
+      lane.appendLog(text);
+      lane.resultEl.textContent = text;
+      lane.setStatus("error", "Error");
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    scheduleRender();
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        const evt = JSON.parse(line);
+        if (evt.t === "exit") exitCode = evt.code;
+        else lane.handle(evt);
+      }
+      scheduleRender();
+    }
+  } catch (error) {
+    if (!state.stopRequested) {
+      lane.appendLog(String(error));
+      setMessage("Se perdió la conexión con el servidor local.");
+    }
+  } finally {
+    state.controller = null;
+  }
+  lane.finish(exitCode);
+  lane.render();
+  updateSummary();
+}
+
+async function runBatch() {
+  let cfg;
+  try {
+    cfg = readConfig();
+  } catch (error) {
+    setMessage(error.message);
+    return;
+  }
+  stopReplay();
+  $("#replay").classList.remove("visible");
+  setMessage("");
+  state.config = cfg;
+  state.stopRequested = false;
+  const lanesRoot = $("#lanes");
+  lanesRoot.textContent = "";
+  state.lanes = cfg.chosen.map((algo) => new Lane(algo, cfg));
+  for (const lane of state.lanes) lanesRoot.append(lane.root);
+  for (const lane of state.lanes) lane.render();
+  updateSummary();
+  setBusy(true);
+  for (const lane of state.lanes) {
+    if (state.stopRequested) {
+      lane.setStatus("stopped", "Omitida");
+      continue;
+    }
+    await runLane(lane);
+  }
+  setBusy(false);
+  if (state.lanes.some((l) => l.events.length)) $("#replay").classList.add("visible");
+  setMessage(state.stopRequested ? "Se detuvo la ejecución." : "Listo. Usa «Repetir juntos» para verlos con el mismo reloj.", true);
+}
+
+async function stopBatch() {
+  state.stopRequested = true;
+  if (state.controller) state.controller.abort();
+  try {
+    await fetch("/api/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  } catch (_) {}
+}
+
+function updateSummary() {
+  const done = state.lanes.filter((l) => l.result);
+  const box = $("#summary");
+  box.classList.toggle("visible", done.length > 0);
+  if (!done.length) return;
+  const cfg = state.config;
+  const seq = done.find((l) => l.algo.id === "secuencial" && l.result.found !== "NA");
+  const found = done.filter((l) => l.result.found !== "NA");
+  const best = found.length ? found.reduce((a, b) => (a.result.time <= b.result.time ? a : b)) : null;
+  const body = $("#summary-body");
+  body.textContent = "";
+  for (const lane of done) {
+    const r = lane.result;
+    const tr = el("tr");
+    if (lane === best && found.length > 1) tr.className = "best";
+    const nameCell = el("td", "", lane.algo.name);
+    if (lane === best && found.length > 1) nameCell.append(el("span", "tag", "más rápido"));
+    const searching = lane.model.searching;
+    const ok = r.found !== "NA";
+    const speedup = seq && ok ? (seq.result.time / r.time).toFixed(2) : "—";
+    const iterSpeed = ok ? (Number(cfg.key + 1n) / r.iterations).toFixed(2) : "—";
+    const rate = r.time > 0 ? r.total / r.time / searching : 0;
+    const cells = [
+      nameCell,
+      el("td", "", lane.algo.id === "maestro_trabajador" ? `${searching} + maestro` : String(searching)),
+      el("td", "", ok ? fmtSeconds(r.time) : `> ${cfg.limit} s`),
+      el("td", "", ok ? lane.finderLabel() : "—"),
+      el("td", "", ok ? fmtInt(r.iterations) : "—"),
+      el("td", "", fmtInt(r.total)),
+      el("td", "", fmtRate(rate)),
+      el("td", "", speedup),
+      el("td", "", iterSpeed),
+    ];
+    tr.append(...cells);
+    body.append(tr);
+  }
+  $("#summary-note").textContent = seq
+    ? `Llave ${fmtInt(cfg.key)} en 2^${cfg.bits}. Speedup = tiempo del secuencial ÷ tiempo del programa; el de intentos no depende del hardware.`
+    : `Llave ${fmtInt(cfg.key)} en 2^${cfg.bits}. Incluye el secuencial para calcular el speedup por tiempo.`;
+}
+
+function buildTracks(lane) {
+  const tracks = Array.from({ length: lane.model.workers }, () => ({ s: [], i: [] }));
+  const chunks = [];
+  for (const evt of lane.events) {
+    if (evt.t === "p") {
+      const tr = tracks[evt.w];
+      const last = tr.i.length ? tr.i[tr.i.length - 1] : -1;
+      if (evt.i >= last) { tr.s.push(evt.s); tr.i.push(evt.i); }
+    } else if (evt.t === "c") {
+      chunks.push(evt);
+    }
+  }
+  chunks.sort((a, b) => a.s - b.s);
+  return { tracks, chunks };
+}
+
+function itersAt(track, t) {
+  const { s, i } = track;
+  if (!s.length || t < s[0]) return 0;
+  let lo = 0;
+  let hi = s.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (s[mid] <= t) lo = mid; else hi = mid - 1;
+  }
+  if (lo === s.length - 1) return i[lo];
+  const span = s[lo + 1] - s[lo];
+  return span > 0 ? i[lo] + ((i[lo + 1] - i[lo]) * (t - s[lo])) / span : i[lo];
+}
+
+function startReplay() {
+  const lanes = state.lanes.filter((l) => l.events.length);
+  if (!lanes.length) return;
+  stopReplay();
+  const data = new Map();
+  let end = 0;
+  for (const lane of lanes) {
+    const tracks = buildTracks(lane);
+    const finish = lane.finalTime || lane.lastS;
+    end = Math.max(end, finish);
+    data.set(lane, { ...tracks, finish, chunkIndex: 0, view: emptyView(lane.model) });
+  }
+  const views = new Map([...data].map(([lane, d]) => [lane, d.view]));
+  const race = $("#race");
+  race.textContent = "";
+  for (const [lane, d] of data) {
+    const row = el("div", "race-row");
+    const bar = el("div", "race-bar");
+    const fill = el("div");
+    bar.append(fill);
+    const time = el("span", "race-time", "");
+    row.append(el("span", "race-name", lane.algo.name), bar, time);
+    race.append(row);
+    d.race = { row, fill, time };
+  }
+  state.replay = { active: true, data, views, end, t: 0, last: performance.now() };
+  $("#replay-btn").textContent = "Reiniciar";
+  for (const lane of state.lanes) {
+    if (!data.has(lane)) continue;
+    lane.pill.textContent = "Repitiendo";
+  }
+  requestAnimationFrame(replayFrame);
+}
+
+function replayFrame(now) {
+  const rp = state.replay;
+  if (!rp || !rp.active) return;
+  rp.t = Math.min(rp.end, rp.t + ((now - rp.last) / 1000) * state.speed);
+  rp.last = now;
+  for (const [lane, d] of rp.data) {
+    const t = Math.min(rp.t, d.finish);
+    const view = d.view;
+    while (d.chunkIndex < d.chunks.length && d.chunks[d.chunkIndex].s <= t) {
+      const c = d.chunks[d.chunkIndex++];
+      addChunk(view, lane.model, c.w, c.k);
+    }
+    for (let w = 0; w < lane.model.workers; w++) view.iters[w] = itersAt(d.tracks[w], t);
+    const done = rp.t >= d.finish;
+    view.finished = done;
+    const fw = lane.finderWorker();
+    const target = lane.result && fw >= 0 ? lane.result.iterations : 0;
+    const progress = done ? 1 : target ? clamp(view.iters[fw] / target, 0, 1) : clamp(t / (d.finish || 1), 0, 1);
+    d.race.fill.style.width = `${progress * 100}%`;
+    d.race.time.textContent = done && lane.result ? (lane.status === "found" ? `✓ ${fmtSeconds(lane.result.time)}` : "sin hallar") : fmtSeconds(t);
+    d.race.row.classList.toggle("done", done && lane.status === "found");
+    d.race.row.classList.toggle("lost", done && lane.status !== "found");
+    if (!d.doneDrawn) {
+      lane.render(view, done && lane.status === "found");
+      lane.timeEl.textContent = fmtSeconds(t);
+      if (done) {
+        d.doneDrawn = true;
+        lane.pill.textContent = lane.status === "found" ? "Encontrada" : lane.pill.textContent;
+        if (lane.result) lane.timeEl.textContent = fmtSeconds(lane.result.time);
+      }
+    }
+  }
+  $("#timeline-fill").style.width = `${(rp.t / rp.end) * 100}%`;
+  $("#clock").textContent = `t = ${rp.t.toFixed(2)} s`;
+  if (rp.t < rp.end) requestAnimationFrame(replayFrame);
+  else finishReplay();
+}
+
+function finishReplay() {
+  const rp = state.replay;
+  if (!rp) return;
+  rp.active = false;
+  $("#replay-btn").textContent = "Repetir juntos";
+  for (const lane of state.lanes) {
+    lane.render();
+    if (lane.result) lane.timeEl.textContent = fmtSeconds(lane.result.time);
+    if (lane.status === "found") lane.pill.textContent = "Encontrada";
+  }
+}
+
+function stopReplay() {
+  if (state.replay) {
+    state.replay.active = false;
+    state.replay = null;
+  }
+  $("#replay-btn").textContent = "Repetir juntos";
+  $("#timeline-fill").style.width = "0%";
+  $("#clock").textContent = "t = 0.00 s";
+  $("#race").textContent = "";
+}
+
+function buildAlgoButtons() {
+  const root = $("#algos");
+  root.textContent = "";
+  for (const algo of ALGORITHMS) {
+    const button = el("button", "algo");
+    button.type = "button";
+    button.dataset.id = algo.id;
+    button.setAttribute("aria-pressed", String(state.selected.has(algo.id)));
+    const strong = el("strong");
+    strong.append(el("span", "check"), document.createTextNode(algo.name));
+    button.append(strong, el("span", "", algo.desc));
+    button.disabled = !state.available.has(algo.id);
+    if (button.disabled) button.title = `No existe bin/${algo.id}: corre «make».`;
+    button.addEventListener("click", () => {
+      if (state.selected.has(algo.id)) state.selected.delete(algo.id);
+      else state.selected.add(algo.id);
+      button.setAttribute("aria-pressed", String(state.selected.has(algo.id)));
+    });
+    root.append(button);
+  }
+}
+
+function wireControls() {
+  for (const stepper of document.querySelectorAll(".stepper")) {
+    const input = $("input", stepper);
+    for (const button of stepper.querySelectorAll("button")) {
+      button.addEventListener("click", () => {
+        const min = Number(input.dataset.min);
+        const max = Number(input.dataset.max);
+        const current = /^\d+$/.test(input.value) ? Number(input.value) : min;
+        input.value = String(clamp(current + Number(button.dataset.step), min, max));
+        input.dispatchEvent(new Event("input"));
+      });
+    }
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      e.preventDefault();
+      const [down, up] = stepper.querySelectorAll("button");
+      (e.key === "ArrowUp" ? up : down).click();
+    });
+  }
+  $("#bits").addEventListener("input", updateSpaceHint);
+  for (const preset of document.querySelectorAll(".preset")) {
+    preset.addEventListener("click", () => {
+      let bits;
+      try { bits = readNumber("bits"); } catch (error) { setMessage(error.message); return; }
+      $("#key").value = presetKey(preset.dataset.preset, bits).toString();
+      setMessage("");
+    });
+  }
+  $("#run").addEventListener("click", runBatch);
+  $("#stop").addEventListener("click", stopBatch);
+  $("#key").addEventListener("keydown", (e) => { if (e.key === "Enter" && !state.running) runBatch(); });
+  $("#replay-btn").addEventListener("click", startReplay);
+  for (const button of document.querySelectorAll("#speed button")) {
+    button.addEventListener("click", () => {
+      state.speed = Number(button.dataset.speed);
+      for (const other of document.querySelectorAll("#speed button")) other.setAttribute("aria-pressed", String(other === button));
+    });
+  }
+  const scheme = window.matchMedia("(prefers-color-scheme: dark)");
+  scheme.addEventListener("change", () => {
+    state.palette = readPalette();
+    for (const lane of state.lanes) { lane.applyPalette(); lane.render(); }
+  });
+}
+
+async function loadInfo() {
+  try {
+    const response = await fetch("/api/info", { cache: "no-store" });
+    if (!response.ok) throw new Error(String(response.status));
+    const info = await response.json();
+    state.available = new Set(info.programs);
+    $("#machine").innerHTML = `${info.cpu || "CPU desconocida"}<br>${info.cores} hilos de hardware · texto: <span class="mono">${info.text}</span>`;
+    if (state.available.size < ALGORITHMS.length) {
+      setMessage("Faltan binarios: corre «make» en la carpeta del proyecto.");
+    }
+  } catch (_) {
+    $("#banner").classList.add("visible");
+    $("#run").disabled = true;
+  }
+  buildAlgoButtons();
+}
+
+state.palette = readPalette();
+wireControls();
+updateSpaceHint();
+buildAlgoButtons();
+loadInfo();
+</script>
+</body>
+</html>

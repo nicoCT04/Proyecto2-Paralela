@@ -42,6 +42,7 @@ Todos aceptan los mismos parámetros:
 | `-t <segundos>` | (búsquedas) límite de tiempo; al vencer se reporta «no encontrada» | `0` (sin límite) |
 | `-c <bits>` | (solo `ciclico` y `maestro_trabajador`) chunk de 2^bits llaves, 8..30 y menor que `-b` | `16` |
 | `-o <archivo>` | (solo `cifrar`) guarda el texto cifrado en binario | — |
+| `-v` | (búsquedas) imprime el avance: `PROGRESS,trabajador,intentos,segundos` cada 131 072 llaves y, en el maestro-trabajador, `CHUNK,trabajador,primera_llave,segundos` por chunk; lo usa el visualizador | apagado |
 
 Presets de llave (con N = 2^bits, así se escalan si se reduce `-b`):
 
@@ -127,6 +128,24 @@ el hilo 0 sondea la antena y el aviso sale fuera de la región paralela.
 **Importante:** Open MPI 5 ata cada proceso a un núcleo, y entonces los T hilos
 se lo disputan. Para que escale hay que lanzarlo con `--bind-to none` (en macOS
 no hace falta, pero no estorba).
+
+## Visualizador
+
+```bash
+make
+python3 visualizer/server.py        # abre http://127.0.0.1:8765
+```
+
+Una página que corre los programas reales (con `mpirun` y `-v`), uno tras otro y
+con la máquina libre, y dibuja el espacio de llaves como un rectángulo: cada
+proceso con su color, tenue lo que falta y fuerte lo ya probado, más una lupa
+con las llaves una por una alrededor de la llave buscada. Se eligen la llave,
+los bits, los procesos, los hilos del híbrido, el chunk y los algoritmos; al
+final «Repetir juntos» los reproduce con el mismo reloj y una tabla compara
+tiempos y speedups. El servidor solo escucha en `127.0.0.1`, solo lanza estos
+seis programas y valida que todos los parámetros sean enteros en rango. Para
+el informe, los tiempos oficiales siguen siendo los de `scripts/campana.sh`:
+el navegador también usa CPU mientras dibuja.
 
 ## Mediciones
 
